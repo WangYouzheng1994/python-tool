@@ -118,7 +118,6 @@ ip='localhost'
 port='9200'
 uri='/test/isOk'
 
-
 try:
     res = HttpUtils.get(ip, port, uri)
 except Exception as e:
