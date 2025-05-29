@@ -1,0 +1,33 @@
+# 本脚本要基于数据库配置表maintenance_deploy_config来执行，所有参数为必填
+base:
+  config:
+    db:
+      url: 192.168.0.69
+      username: root
+      password: 000000
+      db: ry-cloud
+project:
+  git:
+    url:
+    username:
+    password:
+    # git clone basepath
+    base_clone_path:
+    # 非必填，如果写了，那么每次执行都download最新代码
+    version:
+# 对应了maintenance_deploy_config
+deploy:
+  deploy_names:
+    - wyz
+    - b
+    - c
+  # 构建的输出位置默认再当前文件所在的目录下有个output
+  deploy_archive_path:
+message:
+  # ding_group/ding/qwx/mail
+  type: ding
+  config:
+    ding_group:
+    ding:
+    qwx:
+    mail:
