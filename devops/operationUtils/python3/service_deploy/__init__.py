@@ -24,6 +24,8 @@ logging.basicConfig(level=logging.INFO)
 config_name = 'config'
 if len(sys.argv) > 1:
     config_name = sys.argv[1]
+else:
+    logging.info("当前读取的配置文件名为：%s", config_name)
 # 获取当前工作目录的绝对路径
 current_working_directory = os.getcwd()
 # 构建相对路径的绝对路径读取配置文件目录的yaml配置
@@ -48,13 +50,30 @@ def run():
     package_result = build_java_project_package()
 
     logging.info("构建完成，准备上传Java到服务器, %s", package_result)
-    if package_result and package_result.is_success:
-        for package in package_result.result:
-            deploy_ip, deploy_ssh_port, deploy_os_type = package.deploy_ip, package.deploy_ssh_port, package.deploy_os_type
-            deploy_base_path = package.deploy_base_path_linux if deploy_os_type == "1" else package.deploy_base_path_windows
+    if package_result and package_result["is_success"]:
+        for package in package_result["result"]:
+            (
+                deploy_ip, deploy_ssh_port, deploy_user_name,
+                deploy_password, deploy_os_type, deploy_file_path, service_code
+            ) = (
+                package["deploy_ip"], package["deploy_ssh_port"],
+                package["deploy_user_name"], package["deploy_password"],
+                package["deploy_os_type"], package["deploy_file_path"],
+                package["service_code"]
+            )
+            deploy_base_path = package["deploy_base_path_linux"] if deploy_os_type == "1" else package["deploy_base_path_windows"]
+            target_server_path = None
+            if os.name == 'nt':  # windows
+                target_server_path = deploy_base_path + "\\" + deploy_file_path + "\\"
+            else:  # linux/unix
+                target_server_path = deploy_base_path + "/" + deploy_file_path + "/"
 
+            logging.info("开始上传，目标服务器：%s, service_code: %s", deploy_ip, service_code)
             # 上传java
-            contnet_shell(package.deploy_ip, deploy_ssh_port).copy_file(os.path.join(package_result.pack_path), '/opt/myDemo.jar')
+            contnet_shell(hostname=package.deploy_ip, port=deploy_ssh_port, username=deploy_user_name,
+                          password=deploy_password).copy_file(
+                os.path.join(package_result["pack_path"], service_code + ".jar"),
+                target_server_path + service_code)
 
     # for deploy_name in deploy_names:
     #     logging.info("读取mysql部署信息：%s", deploy_name)
@@ -201,7 +220,25 @@ def build_java_project_package():
 
 def build_vue_project_package():
     # 读取配置文件中的service_name
-    deploy_names = yaml.query("deploy.vue.uri")
+    deploy_names = yaml.query("deploy.vue.deploy_names")
+    project_name = yaml.get("project.git.project_name")
+    logging.info("读取本次发版的vue uri为：%s, %s", deploy_names, type(deploy_names))
+    if deploy_names:
+        services = []
+        for service_name in deploy_names:
+            logging.info("读取mysql中的vue部署信息，serviceName:%s", service_name)
+            infos = getProjectInfo(service_name, project_name)
+            if not infos:
+                logging.error("没有读取到mysql中存在对应的vue项目配置！service_name: %s", service_name)
+        try:
+            # 检查项目类型（Maven 或 Gradle）
+            if os.path.exists(os.path.join(clone_absolute_path, "package.json")):
+                logging.info("", "")
+            else:
+                logging.error("没有找到package.json文件")
+                return False
+        except Exception as e:
+            logging.exception("构建vue工程报错了，%s", e)
 
 
 # 2.

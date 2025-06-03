@@ -13,6 +13,7 @@ class contnet_shell:
         username：用户名
         password：密码
     """
+
     def __init__(self, hostname, username, password, port=22):
         self.hostname = hostname
         self.username = username

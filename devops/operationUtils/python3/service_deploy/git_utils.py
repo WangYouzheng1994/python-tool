@@ -117,8 +117,6 @@ class GitUtils:
             return None
 
 
-
-
 # 测试示例
 if __name__ == "__main__":
     GIT_URL = "http://144.123.43.78:9208/gitlab/huangxupeng0831/dataplatform-ruoyi.git"  # 替换为实际的 Git 仓库 URL
