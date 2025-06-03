@@ -72,7 +72,7 @@ class GitUtils:
             print("请确保已配置SSH密钥并添加到ssh-agent")
             return {"method": "ssh"}
 
-    def clone_java_project(self, credentials=None):
+    def clone_java_project(self, credentials=None, branch='master'):
         """从 Git 拉取 Java 项目"""
         try:
             # 处理HTTPS认证
@@ -94,7 +94,7 @@ class GitUtils:
             if not os.listdir(clone_absolute_path):
                 print(f"正在克隆项目: {self.git_url}")
                 subprocess.run(
-                    ["git", "clone", self.git_url, clone_absolute_path],
+                    ["git", "clone", self.git_url, clone_absolute_path, "-b", branch],
                     check=True,
                     text=True,
                     stderr=subprocess.PIPE
@@ -103,7 +103,7 @@ class GitUtils:
             else:
                 print("目录非空，尝试拉取最新代码")
                 subprocess.run(
-                    ["git", "-C", clone_absolute_path, "pull"],
+                    ["git", "-C", clone_absolute_path, "pull", "origin", branch],
                     check=True,
                     text=True,
                     stderr=subprocess.PIPE

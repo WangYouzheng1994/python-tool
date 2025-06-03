@@ -2,8 +2,13 @@
 # -*-coding:utf-8-*-
 import logging
 import os
+import shutil
 import subprocess
 import sys
+from operator import itemgetter
+from pathlib import Path
+
+import proc
 
 from devops.operationUtils.python3.service_deploy.git_utils import GitUtils
 from devops.operationUtils.python3.service_deploy.shell_utils import contnet_shell
@@ -26,6 +31,7 @@ config_absolute_path = os.path.abspath(os.path.join(current_working_directory, '
 yaml = YamlUtils(config_absolute_path)
 clone_absolute_path = None
 
+
 def run():
     """
     1.clone项目
@@ -34,7 +40,7 @@ def run():
     4.推送，并启动，测试，发送消息。
     """
     # 1. 加载yaml，
-    deploy_names = yaml.query("deploy")
+    deploy_names = yaml.query("deploy.deploy_names")
     print(deploy_names)
     if not deploy_names:
         print("你需要在config.yaml中填入deploy_names:发布列表")
@@ -43,33 +49,107 @@ def run():
     logging.info("clone项目")
     cloneAndBuildProject()
     logging.info("开始打包")
-    build_java_project_package()
+    package = build_java_project_package()
+    # for deploy_name in deploy_names:
+    #     logging.info("读取mysql部署信息：%s", deploy_name)
+    #     # 获取到此服务的部署列表
+    #     projects = getProjectInfo(deploy_name)
+    #     if not projects:
+    #         for project in projects:
+    #             (deploy_ip,
+    #              depoly_ssh_port,
+    #              deploy_base_path_linux,
+    #              deploy_file_path,
+    #              service_type,
+    #              deploy_user_name,
+    #              deploy_password) = itemgetter("deploy_ip",
+    #                                            "depoly_ssh_port",
+    #                                            "deploy_base_path_linux",
+    #                                            "deploy_file_path",
+    #                                            "service_type",
+    #                                            "deploy_user_name",
+    #                                            "deploy_password")(project)
+    #
+    #             shell_client = contnet_shell(deploy_ip, deploy_user_name, deploy_password)
+    #             shell_client.copy_file(os.path.join(package, ), os.path.join(deploy_base_path_linux, deploy_file_path))
 
-    getProjectInfo()
+    # getProjectInfo()
 
-
+"""
+输入service_name，获取此服务的部署清单  List<Dict>
+"""
 def getProjectInfo(service_name):
-    db_map = yaml.query_and_map("base.config.db")
+    db_dict = yaml.query("base.config.db")
+    logging.info("读取到base.config.db的配置为：%s", db_dict)
     # 读取mysql对应的项目配置
-    dbinfo = MySQLHelper(host=db_map.url, user=db_map.username, password=db_map.password,
-                         database=db_map.db).query_to_dict(
+    dbinfo = MySQLHelper(host=db_dict["url"], user=db_dict["username"], password=db_dict["password"],
+                         database=db_dict["db"]).query_to_dict(
         query="select * from maintenance_deploy_config where service_name = %(service_name)s ",
         params={"service_name": service_name})
-    print(f'输入serviceName: {service_name}, 找到{len(dbinfo)}个配置项')
+    logging.info('输入serviceName: %s, 找到%s个配置项', service_name, len(dbinfo))
+    logging.debug("具体配置项为：%s", dbinfo)
     return dbinfo
 
 
+"""
+@return result:构建的地址
+"""
+
+
 def build_java_project_package():
-    service_list = yaml.query("deploy")
-    logging.info("读取本次发版清单为：%s", service_list)
-    logging.info(f'{type(service_list.get("deploy_names"))}')
-    if not service_list["deploy_names"]:
+    # 读取配置文件中的service_name
+    deploy_names = yaml.query("deploy.deploy_names")
+    logging.info("读取本次发版清单为：%s, %s", deploy_names, type(deploy_names))
+    resultUrls = []
+    if deploy_names:
+        services = []
+        for deploy_name in deploy_names:
+            logging.info("读取mysql部署信息：%s", deploy_name)
+            infos = getProjectInfo(deploy_name)
+            services.extend(infos)
+            # 遍历每一个部署信息
+            for project in infos:
+                (deploy_ip,
+                 depoly_ssh_port,
+                 deploy_base_path_linux,
+                 deploy_file_path,
+                 service_type,
+                 deploy_user_name,
+                 deploy_password) = itemgetter("deploy_ip",
+                                               "depoly_ssh_port",
+                                               "deploy_base_path_linux",
+                                               "deploy_file_path",
+                                               "service_type",
+                                               "deploy_user_name",
+                                               "deploy_password")(project)
+
+                # logging.info(deploy_ip,
+                #              depoly_ssh_port,
+                #              deploy_base_path_linux,
+                #              deploy_file_path,
+                #              service_type,
+                #              deploy_user_name,
+                #              deploy_password)
+                resultUrls.append({deploy_ip,
+                                   depoly_ssh_port,
+                                   deploy_base_path_linux,
+                                   deploy_file_path,
+                                   service_type,
+                                   deploy_user_name,
+                                   deploy_password})
+
+        logging.info("循环结束, %s", services)
+        # 直接提取去重后的id列表（保留最后出现的元素）
+        unique_ids = list({item["maven_module_uri"]: None for item in services}.keys())
+        logging.info("去重的结果：%s", unique_ids)
         """构建 Java 项目（支持 Maven 和 Gradle）"""
         try:
             # 检查项目类型（Maven 或 Gradle）
             if os.path.exists(os.path.join(clone_absolute_path, "pom.xml")):
+                logging.info("输入的deploynames: %s, 标识位: %s", deploy_names, unique_ids)
+                build_cmd = ["mvn", "clean", "package -am -pl", ",".join(unique_ids)]
                 logging.info("检测到 Maven 项目")
-                build_cmd = ["mvn", "clean", "package -am -pl ", service_list.join(",")]
+                resultUrl = os.path.join(clone_absolute_path, "dist")
             # elif os.path.exists(os.path.join(self.project_dir, "build.gradle")) or \
             #         os.path.exists(os.path.join(self.project_dir, "build.gradle.kts")):
             #     print("检测到 Gradle 项目")
@@ -80,23 +160,50 @@ def build_java_project_package():
                 logging.error("未找到 Maven项目POM文件")
                 return False
 
-            logging.info(f"开始构建项目: {' '.join(build_cmd)}")
+            logging.info(f"开始构建项目: {' '.join(build_cmd)}, cwd: {clone_absolute_path}")
+            # 检查 mvn 命令是否存在
+            if not shutil.which("mvn"):
+                raise RuntimeError("未找到 Maven 命令，请确保已安装并配置 PATH")
+
+            if os.path.exists(clone_absolute_path):
+                logging.debug("路径存在")
+            else:
+                logging.debug(f"路径不存在: {clone_absolute_path}")
+
             result = subprocess.run(
-                build_cmd,
+                " ".join(build_cmd),
                 cwd=clone_absolute_path,
+                shell=True,
                 check=True,
                 text=True,
                 capture_output=True
             )
 
-            print("构建成功")
-            print(f"构建输出: {result.stdout}")
-            return True
+            # subprocess.Popen
+            # # 循环读取输出
+            # while True:
+            #     out = result.stdout.readline()
+            #     err = result.stderr.readline()
+            #     if out == '' and err == '':
+            #         break
+            #     if out:
+            #         print('stdout:', out.strip())
+            #     if err:
+            #         print('stderr:', err.strip())
+            #
+            # # 等待进程结束
+            # result.wait()
+
+            logging.info("构建成功")
+            logging.info("构建输出: %s", result.stdout)
+            return {"is_success": True, "result": resultUrl}
         except subprocess.CalledProcessError as e:
             print(f"构建失败: {e.stderr}")
-            return False
+            return {"is_success": False, "result": resultUrl}
     else:
         logging.error("请配置deploy.deploy_names")
+
+
 # 2.
 def cloneAndBuildProject():
     # 声明全局变量（需要修改的）
@@ -110,7 +217,7 @@ def cloneAndBuildProject():
                    build_base_path=git_info['base_clone_path'],
                    instance_id=git_info['version'],
                    project_name=git_info['project_name'])
-    clone_absolute_path = git.clone_java_project(git.get_git_credentials())
+    clone_absolute_path = git.clone_java_project(git.get_git_credentials(), 'dev')
 
 
 # 3. 根据项目类型，执行构建
@@ -157,6 +264,39 @@ def cloneAndBuildProject():
 # else:
 #     print(f'返回值：{res.status_code}, 容器启动不成功\n')
 # shell.close_cont()
+
+"""
+获取对应的maven路径，避免执行shell的时候出一些这那那这的path问题：
+当使用shell[]的时候如果path没有Maven路径，那么就不好使，恶心死人了
+"""
+def find_maven_path() -> str:
+    """优先通过 MAVEN_HOME 查找，再自动检测"""
+    # 1. 优先使用 MAVEN_HOME
+    maven_home = os.environ.get("MAVEN_HOME")
+    if maven_home:
+        maven_bin = os.path.join(maven_home, "bin", "mvn")
+        logging.info("maven_home: %s", maven_bin)
+        if os.path.exists(maven_bin):
+            # return maven_bin
+             return "mvn"
+
+    # 2. 从系统 PATH 查找
+    path_from_env = shutil.which("mvn")
+    if path_from_env:
+        # return path_from_env
+        return "mvn"
+    # 3. 扫描常见安装路径（Windows）
+    common_paths = [
+        r"C:\Program Files\Apache Maven\bin\mvn.exe",
+        r"C:\Program Files (x86)\Apache Maven\bin\mvn.exe",
+        str(Path.home() / "apache-maven" / "bin" / "mvn.exe"),
+    ]
+    for path in common_paths:
+        if os.path.exists(path):
+            return path
+
+    raise FileNotFoundError("未找到 Maven，请配置 MAVEN_HOME 或安装 Maven。")
+
 
 if __name__ == '__main__':
     run()

@@ -4,7 +4,7 @@ base:
     db:
       url: 192.168.0.69
       username: root
-      password: 000000
+      password: '000000'
       db: ry-cloud
 project:
   git:
@@ -12,16 +12,15 @@ project:
     username: root
     password: wyz123!@#
     # git clone basepath
-    base_clone_path: C:\test2
+    base_clone_path: C:\\test2
     project_name: opsyndex-java
     version: 1.0
 
-# 对应了maintenance_deploy_config
+# 对应了maintenance_deploy_config的service_name（用来区分环境变量，为未来的中心化上云服务提供基础）
 deploy:
   deploy_names:
-    - wyz
-    - b
-    - c
+    - opsyndex-auth
+    - opsyndex-system
 message:
   # none/ding_group/ding/qwx/mail
   type: ding
