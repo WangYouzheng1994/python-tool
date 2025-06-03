@@ -39,17 +39,23 @@ def run():
     3.获取对应的部署清单(mysql)
     4.推送，并启动，测试，发送消息。
     """
-    # 1. 加载yaml，
-    deploy_names = yaml.query("deploy.deploy_names")
-    print(deploy_names)
-    if not deploy_names:
-        print("你需要在config.yaml中填入deploy_names:发布列表")
-    else:
-        print(f"读取到deploy配置：{deploy_names}，开始构建")
+    # 1. clone项目
     logging.info("clone项目")
     cloneAndBuildProject()
-    logging.info("开始打包")
-    package = build_java_project_package()
+
+    # 2. 构建（Java And Vue）
+    logging.info("开始打包Java")
+    package_result = build_java_project_package()
+
+    logging.info("构建完成，准备上传Java到服务器, %s", package_result)
+    if package_result and package_result.is_success:
+        for package in package_result.result:
+            deploy_ip, deploy_ssh_port, deploy_os_type = package.deploy_ip, package.deploy_ssh_port, package.deploy_os_type
+            deploy_base_path = package.deploy_base_path_linux if deploy_os_type == "1" else package.deploy_base_path_windows
+
+            # 上传java
+            contnet_shell(package.deploy_ip, deploy_ssh_port).copy_file(os.path.join(package_result.pack_path), '/opt/myDemo.jar')
+
     # for deploy_name in deploy_names:
     #     logging.info("读取mysql部署信息：%s", deploy_name)
     #     # 获取到此服务的部署列表
@@ -75,37 +81,41 @@ def run():
 
     # getProjectInfo()
 
+
 """
 输入service_name，获取此服务的部署清单  List<Dict>
 """
-def getProjectInfo(service_name):
+
+
+def getProjectInfo(service_name, project_name):
     db_dict = yaml.query("base.config.db")
     logging.info("读取到base.config.db的配置为：%s", db_dict)
     # 读取mysql对应的项目配置
     dbinfo = MySQLHelper(host=db_dict["url"], user=db_dict["username"], password=db_dict["password"],
                          database=db_dict["db"]).query_to_dict(
-        query="select * from maintenance_deploy_config where service_name = %(service_name)s ",
-        params={"service_name": service_name})
+        query="select * from maintenance_deploy_config where service_name = %(service_name)s and project_name = %(project_name)s ",
+        params={"service_name": service_name, "project_name": project_name})
     logging.info('输入serviceName: %s, 找到%s个配置项', service_name, len(dbinfo))
     logging.debug("具体配置项为：%s", dbinfo)
     return dbinfo
 
 
 """
-@return result:构建的地址
+
+@return result:构建的java包的绝对路径地址
 """
 
 
 def build_java_project_package():
     # 读取配置文件中的service_name
-    deploy_names = yaml.query("deploy.deploy_names")
+    deploy_names = yaml.query("deploy.java.deploy_names")
+    project_name = yaml.get("project.git.project_name")
     logging.info("读取本次发版清单为：%s, %s", deploy_names, type(deploy_names))
-    resultUrls = []
     if deploy_names:
         services = []
-        for deploy_name in deploy_names:
-            logging.info("读取mysql部署信息：%s", deploy_name)
-            infos = getProjectInfo(deploy_name)
+        for service_name in deploy_names:
+            logging.info("读取mysql部署信息，serviceName:%s", service_name)
+            infos = getProjectInfo(service_name, project_name)
             services.extend(infos)
             # 遍历每一个部署信息
             for project in infos:
@@ -122,21 +132,6 @@ def build_java_project_package():
                                                "service_type",
                                                "deploy_user_name",
                                                "deploy_password")(project)
-
-                # logging.info(deploy_ip,
-                #              depoly_ssh_port,
-                #              deploy_base_path_linux,
-                #              deploy_file_path,
-                #              service_type,
-                #              deploy_user_name,
-                #              deploy_password)
-                resultUrls.append({deploy_ip,
-                                   depoly_ssh_port,
-                                   deploy_base_path_linux,
-                                   deploy_file_path,
-                                   service_type,
-                                   deploy_user_name,
-                                   deploy_password})
 
         logging.info("循环结束, %s", services)
         # 直接提取去重后的id列表（保留最后出现的元素）
@@ -196,12 +191,17 @@ def build_java_project_package():
 
             logging.info("构建成功")
             logging.info("构建输出: %s", result.stdout)
-            return {"is_success": True, "result": resultUrl}
+            return {"is_success": True, "result": services, "pack_path": resultUrl}
         except subprocess.CalledProcessError as e:
-            print(f"构建失败: {e.stderr}")
-            return {"is_success": False, "result": resultUrl}
+            logging.exception(f"构建失败: {e.stderr}")
+            return {"is_success": False, "result": {}}
     else:
-        logging.error("请配置deploy.deploy_names")
+        logging.error("请配置deploy.java.deploy_names")
+
+
+def build_vue_project_package():
+    # 读取配置文件中的service_name
+    deploy_names = yaml.query("deploy.vue.uri")
 
 
 # 2.
@@ -269,6 +269,8 @@ def cloneAndBuildProject():
 获取对应的maven路径，避免执行shell的时候出一些这那那这的path问题：
 当使用shell[]的时候如果path没有Maven路径，那么就不好使，恶心死人了
 """
+
+
 def find_maven_path() -> str:
     """优先通过 MAVEN_HOME 查找，再自动检测"""
     # 1. 优先使用 MAVEN_HOME
@@ -278,7 +280,7 @@ def find_maven_path() -> str:
         logging.info("maven_home: %s", maven_bin)
         if os.path.exists(maven_bin):
             # return maven_bin
-             return "mvn"
+            return "mvn"
 
     # 2. 从系统 PATH 查找
     path_from_env = shutil.which("mvn")
