@@ -1,5 +1,6 @@
 #!/user/bin/env python
 # -*-coding:utf-8-*-
+import logging
 import os
 import subprocess
 from getpass import getpass
@@ -23,7 +24,7 @@ class GitUtils:
 
         self.project_name = project_name
         self.build_base_path = build_base_path
-        self.instance_id = instance_id
+        self.instance_id = str(instance_id)
     """
     拉取项目
     """
@@ -75,16 +76,17 @@ class GitUtils:
         """从 Git 拉取 Java 项目"""
         try:
             # 处理HTTPS认证
-            if credentials and credentials["method"] == "https":
+            if credentials and credentials["method"].lower() in ["http"]:
                 # 替换URL为认证URL
                 auth_url = self.git_url.replace(
-                    "https://",
-                    f"https://{credentials['username']}:{credentials['password']}@"
+                    "http://",
+                    f"http://{credentials['username']}:{credentials['password']}@"
                 )
             else:
                 auth_url = self.git_url
 
             # 创建目标目录（如果不存在）
+            logging.info("clone_absolute_path，项目克隆目录为： %s,%s,%s", self.build_base_path, self.project_name, self.instance_id)
             clone_absolute_path = os.path.join(self.build_base_path, self.project_name, self.instance_id)
             Path(clone_absolute_path).mkdir(parents=True, exist_ok=True)
 
@@ -108,44 +110,12 @@ class GitUtils:
                 )
                 print("拉取完成")
 
-            self.project_url = clone_absolute_path
+            self.project_dir = clone_absolute_path
+            return clone_absolute_path
         except subprocess.CalledProcessError as e:
             print(f"Git 操作失败: {e.stderr}")
             return None
 
-    def build_java_project_package(self):
-        """构建 Java 项目（支持 Maven 和 Gradle）"""
-        try:
-            # 检查项目类型（Maven 或 Gradle）
-            if os.path.exists(os.path.join(self.project_dir, "pom.xml")):
-                print("检测到 Maven 项目")
-                build_cmd = ["mvn", "clean", "package"]
-            elif os.path.exists(os.path.join(project_dir, "build.gradle")) or \
-                    os.path.exists(os.path.join(project_dir, "build.gradle.kts")):
-                print("检测到 Gradle 项目")
-                # 使用 wrapper 或系统安装的 Gradle
-                gradle_cmd = "./gradlew" if os.path.exists(os.path.join(project_dir, "gradlew")) else "gradle"
-                build_cmd = [gradle_cmd, "clean", "build"]
-            else:
-                print("未找到 Maven 或 Gradle 项目文件")
-                return False
-
-            print(f"开始构建项目: {' '.join(build_cmd)}")
-            result = subprocess.run(
-                build_cmd,
-                cwd=project_dir,
-                check=True,
-                text=True,
-                capture_output=True
-            )
-
-            print("构建成功")
-            print(f"构建输出: {result.stdout}")
-            return True
-
-        except subprocess.CalledProcessError as e:
-            print(f"构建失败: {e.stderr}")
-            return False
 
 
 

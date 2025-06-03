@@ -2,6 +2,7 @@
 # -*-coding:utf-8-*-
 import logging
 import os
+import subprocess
 import sys
 
 from devops.operationUtils.python3.service_deploy.git_utils import GitUtils
@@ -23,7 +24,7 @@ current_working_directory = os.getcwd()
 # 构建相对路径的绝对路径读取配置文件目录的yaml配置
 config_absolute_path = os.path.abspath(os.path.join(current_working_directory, 'config', f'{config_name}.yaml'))
 yaml = YamlUtils(config_absolute_path)
-
+clone_absolute_path = None
 
 def run():
     """
@@ -32,16 +33,20 @@ def run():
     3.获取对应的部署清单(mysql)
     4.推送，并启动，测试，发送消息。
     """
-
     # 1. 加载yaml，
-
-    deploy = yaml.query("deploy")
-    if not deploy.deploy_names:
+    deploy_names = yaml.query("deploy")
+    print(deploy_names)
+    if not deploy_names:
         print("你需要在config.yaml中填入deploy_names:发布列表")
     else:
-        print(f"读取到deploy配置：{deploy.deploy_names}，开始构建")
+        print(f"读取到deploy配置：{deploy_names}，开始构建")
+    logging.info("clone项目")
+    cloneAndBuildProject()
+    logging.info("开始打包")
+    build_java_project_package()
 
     getProjectInfo()
+
 
 def getProjectInfo(service_name):
     db_map = yaml.query_and_map("base.config.db")
@@ -53,18 +58,59 @@ def getProjectInfo(service_name):
     print(f'输入serviceName: {service_name}, 找到{len(dbinfo)}个配置项')
     return dbinfo
 
+
+def build_java_project_package():
+    service_list = yaml.query("deploy")
+    logging.info("读取本次发版清单为：%s", service_list)
+    logging.info(f'{type(service_list.get("deploy_names"))}')
+    if not service_list["deploy_names"]:
+        """构建 Java 项目（支持 Maven 和 Gradle）"""
+        try:
+            # 检查项目类型（Maven 或 Gradle）
+            if os.path.exists(os.path.join(clone_absolute_path, "pom.xml")):
+                logging.info("检测到 Maven 项目")
+                build_cmd = ["mvn", "clean", "package -am -pl ", service_list.join(",")]
+            # elif os.path.exists(os.path.join(self.project_dir, "build.gradle")) or \
+            #         os.path.exists(os.path.join(self.project_dir, "build.gradle.kts")):
+            #     print("检测到 Gradle 项目")
+            #     # 使用 wrapper 或系统安装的 Gradle
+            #     gradle_cmd = "./gradlew" if os.path.exists(os.path.join(self.project_dir, "gradlew")) else "gradle"
+            #     build_cmd = [gradle_cmd, "clean", "build"]
+            else:
+                logging.error("未找到 Maven项目POM文件")
+                return False
+
+            logging.info(f"开始构建项目: {' '.join(build_cmd)}")
+            result = subprocess.run(
+                build_cmd,
+                cwd=clone_absolute_path,
+                check=True,
+                text=True,
+                capture_output=True
+            )
+
+            print("构建成功")
+            print(f"构建输出: {result.stdout}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"构建失败: {e.stderr}")
+            return False
+    else:
+        logging.error("请配置deploy.deploy_names")
 # 2.
 def cloneAndBuildProject():
+    # 声明全局变量（需要修改的）
+    global clone_absolute_path
     # 从配置文件中读取git信息
-    git_info = yaml.query_and_map("project.git")
-    base_clone_path = git_info.base_clone_path
-    git = GitUtils(git_url=git_info.url,
-                   username=git_info.username,
-                   password=git_info.password,
-                   build_base_path=base_clone_path,
-                   instance_id=git_info.version)
-    git.clone_java_project(git.get_git_credentials())
-    git.build_java_project_package()
+    git_info = yaml.query("project.git")
+    logging.info("读取到的git配置为：%s", git_info)
+    git = GitUtils(git_url=git_info['url'],
+                   username=git_info['username'],
+                   password=git_info['password'],
+                   build_base_path=git_info['base_clone_path'],
+                   instance_id=git_info['version'],
+                   project_name=git_info['project_name'])
+    clone_absolute_path = git.clone_java_project(git.get_git_credentials())
 
 
 # 3. 根据项目类型，执行构建
@@ -97,20 +143,20 @@ def cloneAndBuildProject():
 
 # 向地址发送请求，通过状态码判断是否成功
 # time.sleep(5)
-res = ""
-ip = 'localhost'
-port = '9200'
-uri = '/test/isOk'
-
-try:
-    res = HttpUtils.get(ip, port, uri)
-except Exception as e:
-    raise e
-if (res.status_code == 200):
-    print('成功！！！\n')
-else:
-    print(f'返回值：{res.status_code}, 容器启动不成功\n')
-shell.close_cont()
+# res = ""
+# ip = 'localhost'
+# port = '9200'
+# uri = '/test/isOk'
+#
+# try:
+#     res = HttpUtils.get(ip, port, uri)
+# except Exception as e:
+#     raise e
+# if (res.status_code == 200):
+#     print('成功！！！\n')
+# else:
+#     print(f'返回值：{res.status_code}, 容器启动不成功\n')
+# shell.close_cont()
 
 if __name__ == '__main__':
     run()

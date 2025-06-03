@@ -8,23 +8,22 @@ base:
       db: ry-cloud
 project:
   git:
-    url:
-    username:
-    password:
+    url: http://144.123.43.78:9208/gitlab/huangxupeng0831/dataplatform-ruoyi.git
+    username: root
+    password: wyz123!@#
     # git clone basepath
-    base_clone_path:
-    # 非必填，如果写了，那么每次执行都download最新代码
-    version:
+    base_clone_path: C:\test2
+    project_name: opsyndex-java
+    version: 1.0
+
 # 对应了maintenance_deploy_config
 deploy:
   deploy_names:
     - wyz
     - b
     - c
-  # 构建的输出位置默认再当前文件所在的目录下有个output
-  deploy_archive_path:
 message:
-  # ding_group/ding/qwx/mail
+  # none/ding_group/ding/qwx/mail
   type: ding
   config:
     ding_group:
