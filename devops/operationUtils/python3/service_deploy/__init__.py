@@ -54,26 +54,57 @@ def run():
         for package in package_result["result"]:
             (
                 deploy_ip, deploy_ssh_port, deploy_user_name,
-                deploy_password, deploy_os_type, deploy_file_path, service_code
+                deploy_password, deploy_os_type, deploy_file_path, service_code, springboot_http_port, jvm_config
             ) = (
-                package["deploy_ip"], package["deploy_ssh_port"],
+                package["deploy_ip"], int(package["deploy_ssh_port"]),
                 package["deploy_user_name"], package["deploy_password"],
                 package["deploy_os_type"], package["deploy_file_path"],
-                package["service_code"]
+                package["service_code"], package["springboot_http_port"],
+                package["jvm_config"]
             )
-            deploy_base_path = package["deploy_base_path_linux"] if deploy_os_type == "1" else package["deploy_base_path_windows"]
-            target_server_path = None
-            if os.name == 'nt':  # windows
-                target_server_path = deploy_base_path + "\\" + deploy_file_path + "\\"
-            else:  # linux/unix
-                target_server_path = deploy_base_path + "/" + deploy_file_path + "/"
+            deploy_base_path = package["deploy_base_path_linux"] if deploy_os_type == "1" else package[
+                "deploy_base_path_windows"]
+            deploy_file_path = deploy_file_path if deploy_file_path != None else ""
 
-            logging.info("开始上传，目标服务器：%s, service_code: %s", deploy_ip, service_code)
-            # 上传java
-            contnet_shell(hostname=package.deploy_ip, port=deploy_ssh_port, username=deploy_user_name,
-                          password=deploy_password).copy_file(
-                os.path.join(package_result["pack_path"], service_code + ".jar"),
-                target_server_path + service_code)
+            shell = contnet_shell(hostname=deploy_ip, port=deploy_ssh_port, username=deploy_user_name,
+                                  password=deploy_password)
+            # 获取目标服务器系统对应的文件路径分隔符
+            directory_separator = shell.get_directory_separator()
+            # 拼接部署根路径+ 文件相对路径
+            target_server_path = deploy_base_path + directory_separator + deploy_file_path + directory_separator
+
+            logging.info("开始上传，目标服务器：%s, service_code: %s, 本地构建目录：%s, 目标服务器地址： %s",
+                         deploy_ip,
+                         service_code,
+                         os.path.join(package_result["pack_path"], service_code + ".jar"),
+                         target_server_path + service_code)
+            try:
+                # 上传java
+                upload = shell.copy_file(os.path.join(package_result["pack_path"], service_code + ".jar"),
+                                         target_server_path, service_code + ".jar")
+                server_port = f'--server.port={springboot_http_port}' if springboot_http_port else ''
+                jvm_params = f' {jvm_config}' if jvm_config else ''
+
+                if upload:
+                    old_prc_id = shell.exec_cmd(
+                        f"ps -ef | grep {service_code} | grep -v grep | grep -v bash | awk" + ' \'{print $2}\'')
+
+                    if old_prc_id and old_prc_id[1]:
+                        logging.info("检测到有存在的服务进程：%s", old_prc_id)
+                        shell.exec_cmd(f"kill -9 {old_prc_id[1]}")
+                        logging.info("杀死进程号：%s", old_prc_id[1])
+
+                    logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
+                    cmd = shell.exec_cmd(f"nohup java -jar {service_code + '.jar'} {server_port} {jvm_params} > {service_code + '.log'} 2>&1 & ",
+                                         target_server_path)
+                    logging.info("%s, 启动结果：%s", deploy_ip, cmd)
+                else :
+                    logging.error("上传失败！服务：%s，目标服务器：%s，目标路径：%s", service_code, deploy_ip, target_server_path)
+            except Exception as e:
+                logging.exception(e)
+
+            # 关闭shell避免泄露
+            shell.close_cont()
 
     # for deploy_name in deploy_names:
     #     logging.info("读取mysql部署信息：%s", deploy_name)
@@ -99,7 +130,6 @@ def run():
     #             shell_client.copy_file(os.path.join(package, ), os.path.join(deploy_base_path_linux, deploy_file_path))
 
     # getProjectInfo()
-
 
 """
 输入service_name，获取此服务的部署清单  List<Dict>
@@ -139,13 +169,13 @@ def build_java_project_package():
             # 遍历每一个部署信息
             for project in infos:
                 (deploy_ip,
-                 depoly_ssh_port,
+                 deploy_ssh_port,
                  deploy_base_path_linux,
                  deploy_file_path,
                  service_type,
                  deploy_user_name,
                  deploy_password) = itemgetter("deploy_ip",
-                                               "depoly_ssh_port",
+                                               "deploy_ssh_port",
                                                "deploy_base_path_linux",
                                                "deploy_file_path",
                                                "service_type",
@@ -156,6 +186,8 @@ def build_java_project_package():
         # 直接提取去重后的id列表（保留最后出现的元素）
         unique_ids = list({item["maven_module_uri"]: None for item in services}.keys())
         logging.info("去重的结果：%s", unique_ids)
+
+
         """构建 Java 项目（支持 Maven 和 Gradle）"""
         try:
             # 检查项目类型（Maven 或 Gradle）
@@ -217,7 +249,9 @@ def build_java_project_package():
     else:
         logging.error("请配置deploy.java.deploy_names")
 
-
+"""
+构建打包VUE项目
+"""
 def build_vue_project_package():
     # 读取配置文件中的service_name
     deploy_names = yaml.query("deploy.vue.deploy_names")

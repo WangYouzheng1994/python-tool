@@ -21,14 +21,32 @@ class contnet_shell:
         self.port = port
         self._ssh_fd = paramiko.SSHClient()
         self._ssh_fd.set_missing_host_key_policy(paramiko.AutoAddPolicy)
-        logging.info("正在连接linux服务器")
+        logging.info("正在连接服务器")
         self._ssh_fd.connect(hostname, username=username, password=password, port=port)
 
         self._transport = paramiko.Transport((hostname, port))
         self._transport.connect(username=username, password=password)
         # 创建sftp客户端
         self.sftp = paramiko.SFTPClient.from_transport(self._transport)
-        logging.info("连接Linux成功")
+        logging.info("连接成功")
+
+        # 尝试 Windows 命令
+        stdin, stdout, stderr = self._ssh_fd.exec_command("echo %OS%")
+        output = stdout.read().decode()
+        if "Windows_NT" in output:
+            self.os_name = "windows"
+
+        # 尝试 Linux 命令
+        stdin, stdout, stderr = self._ssh_fd.exec_command("uname -s")
+        output = stdout.read().decode()
+        if "Linux" in output:
+            self.os_name = "linux"
+
+        # 尝试 macOS 命令
+        stdin, stdout, stderr = self._ssh_fd.exec_command("sw_vers")
+        output = stdout.read().decode()
+        if "ProductName" in output:
+            self.os_name = "macos"
 
     def close_cont(self):
         self._ssh_fd.close()
@@ -36,22 +54,46 @@ class contnet_shell:
         print('关闭连接')
 
     """
+    获取文件分隔符
+    
+    """
+    def get_directory_separator(self):
+        directory_separator = "/"
+        if self.os_name == 'windows':  # windows
+            directory_separator = "\\"
+        else:  # linux/unix
+            directory_separator = "/"
+
+        return directory_separator
+
+    """
     上传文件到Linux远程服务器
-    local_src： 本地文件路径 
-    remote_src： 服务器上保存文件的路径 
+    local_src： 本地文件路径包含文件
+    remote_src： 服务器上保存文件的路径，不包含文件就是目录 
     """
 
-    def copy_file(self, local_src, remote_src):
+    def copy_file(self, local_src, remote_src, file_name):
+        try:
+            self.sftp.remove(remote_src + self.get_directory_separator() + file_name)
+        except Exception as e:
+            logging.exception("刪除报错了")
         logging.info("正在上传文件，请等待........")
-        self.sftp.put(local_src, remote_src)
+        self.sftp.put(local_src, remote_src + self.get_directory_separator() + file_name)
         logging.info("文件上传成功...............")
+        return True
 
     """
     执行Linux命令
     cmd: Linux命令 例: ls /
+    path: 默认为空，如果不为空，需要切换目录
     """
 
-    def exec_cmd(self, cmd):
+    def exec_cmd(self, cmd, path=None):
+        if path:
+            logging.info("执行命令前，进行路径跳转：%s", path)
+            self._ssh_fd.exec_command(f"cd {path}")
+
+        logging.info("执行远程命令：%s", cmd)
         stdin, stdout, stderr = self._ssh_fd.exec_command(cmd)
         res = ''
         if stdout.channel.recv_exit_status() != 0:

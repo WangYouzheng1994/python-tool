@@ -92,28 +92,28 @@ class GitUtils:
 
             # 检查目录是否为空
             if not os.listdir(clone_absolute_path):
-                print(f"正在克隆项目: {self.git_url}")
+                logging.info(f"正在克隆项目: {self.git_url}")
                 subprocess.run(
                     ["git", "clone", self.git_url, clone_absolute_path, "-b", branch],
                     check=True,
                     text=True,
                     stderr=subprocess.PIPE
                 )
-                print("克隆完成")
+                logging.info("克隆完成")
             else:
-                print("目录非空，尝试拉取最新代码")
+                logging.info("目录非空，尝试拉取最新代码")
                 subprocess.run(
                     ["git", "-C", clone_absolute_path, "pull", "origin", branch],
                     check=True,
                     text=True,
                     stderr=subprocess.PIPE
                 )
-                print("拉取完成")
+                logging.info("拉取完成")
 
             self.project_dir = clone_absolute_path
             return clone_absolute_path
         except subprocess.CalledProcessError as e:
-            print(f"Git 操作失败: {e.stderr}")
+            logging.exception(f"Git 操作失败: {e.stderr}")
             return None
 
 

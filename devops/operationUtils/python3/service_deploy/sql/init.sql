@@ -5,15 +5,19 @@ CREATE TABLE `maintenance_deploy_config` (
   `service_code` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '服务号',
   `instance_no` int NOT NULL DEFAULT '1' COMMENT '实例号',
   `maven_module_uri` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '构建定位，配合am使用',
+  `jvm_config` varchar(2000) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'springboot jvm参数',
   `deploy_ip` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '要部署的服务器ip',
-  `depoly_ssh_port` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '要部署的服务器ssh端口',
-  `deploy_os_type` char(2) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '1:linux;2:windows',
+  `deploy_ssh_port` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '要部署的服务器ssh端口',
+  `deploy_os_type` char(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '1' COMMENT '1:linux;2:windows',
   `deploy_base_path_windows` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '项目基础路径windows',
   `deploy_base_path_linux` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '项目基础路径linux',
   `deploy_file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '相对部署路径',
-  `service_type` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '1' COMMENT '1:java;2:前端vue2',
+  `service_type` char(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '1' COMMENT '1:java;2:前端vue2',
   `deploy_user_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '账号',
   `deploy_password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '密码',
+  `springboot_http_port` int DEFAULT NULL COMMENT 'springboot服务端口号，对应maven的Dserver.port',
+  `web_script` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'vue项目要运行的脚本id',
+  `use_flag` char(2) COLLATE utf8mb4_general_ci NOT NULL DEFAULT '0' COMMENT '实例状态：0启用，1禁用',
   `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
   `create_by` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '创建人',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -22,4 +26,4 @@ CREATE TABLE `maintenance_deploy_config` (
   `del_flag` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除(0 未删除  1已删除)',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_service_instance` (`service_code`,`instance_no`) COMMENT '服务+实例唯一'
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='运维中心，部署机器清单';
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='运维中心，部署机器清单';
