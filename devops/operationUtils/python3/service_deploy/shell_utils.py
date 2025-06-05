@@ -51,12 +51,12 @@ class contnet_shell:
     def close_cont(self):
         self._ssh_fd.close()
         self.sftp.close()
-        print('关闭连接')
+        logging.info('关闭连接')
 
     """
     获取文件分隔符
-    
     """
+
     def get_directory_separator(self):
         directory_separator = "/"
         if self.os_name == 'windows':  # windows
@@ -89,23 +89,37 @@ class contnet_shell:
     """
 
     def exec_cmd(self, cmd, path=None):
+        path = f"cd {path} &&" if path else ""
         if path:
             logging.info("执行命令前，进行路径跳转：%s", path)
-            self._ssh_fd.exec_command(f"cd {path}")
+            # self._ssh_fd.exec_command(f"cd {path}", get_pty=True)
 
         logging.info("执行远程命令：%s", cmd)
-        stdin, stdout, stderr = self._ssh_fd.exec_command(cmd)
-        res = ''
+        stdin, stdout, stderr = self._ssh_fd.exec_command(path + cmd, get_pty=False)
+        out_res = ''
+        err_res = ''
         if stdout.channel.recv_exit_status() != 0:
-            for line in stderr.readlines():
-                logging.info(line)
-                res += line
-            return False, res
-        else:
             for line in stdout.readlines():
                 logging.info(line)
-                res += line
-            return True, res
+                out_res += line
+        else:
+            for line in stderr.readlines():
+                logging.info(line)
+                err_res += line
+        exit_status = stdout.channel.recv_exit_status()
+
+        # if stdout.channel.recv_exit_status() != 0:
+        #     for line in stderr.readlines():
+        #         logging.info(line)
+        #         res += line
+        #     return False, res
+        # else:
+        #     for line in stdout.readlines():
+        #         logging.info(line)
+        #         res += line
+        #     return True, res
+        logging.info("命令执行结果，out:%s, err:%s, exit_status: %s", out_res, err_res, exit_status)
+        return (exit_status == 0, out_res, err_res)
 
     def yum(self, cmd):
         cmd = cmd + '\n'  # 加一个回车键

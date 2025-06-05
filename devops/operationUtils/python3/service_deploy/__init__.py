@@ -11,6 +11,7 @@ from pathlib import Path
 
 import proc
 
+from devops.operationUtils.python3.mysql_slow_warn.slow_mysql_groupchat_robot import DingdingGroupchat
 from devops.operationUtils.python3.service_deploy.git_utils import GitUtils
 from devops.operationUtils.python3.service_deploy.shell_utils import contnet_shell
 from devops.operationUtils.python3.util.http_utils import HttpUtils
@@ -44,7 +45,7 @@ def run():
     """
     # 1. clone项目
     logging.info("clone项目")
-    cloneAndBuildProject()
+    clone_build_project()
 
     # 2. 构建（Java And Vue）
     logging.info("开始打包Java")
@@ -56,12 +57,14 @@ def run():
             (
                 deploy_ip, deploy_ssh_port, deploy_user_name,
                 deploy_password, deploy_os_type, deploy_file_path, service_code, springboot_http_port, jvm_config
+                , service_name, service_type
             ) = (
                 package["deploy_ip"], int(package["deploy_ssh_port"]),
                 package["deploy_user_name"], package["deploy_password"],
                 package["deploy_os_type"], package["deploy_file_path"],
                 package["service_code"], package["springboot_http_port"],
-                package["jvm_config"]
+                package["jvm_config"], package["service_name"],
+                package["service_type"]
             )
             deploy_base_path = package["deploy_base_path_linux"] if deploy_os_type == "1" else package[
                 "deploy_base_path_windows"]
@@ -80,35 +83,50 @@ def run():
                          os.path.join(package_result["pack_path"], service_code + ".jar"),
                          target_server_path + service_code)
             try:
-                # 上传java
-                upload = shell.copy_file(os.path.join(package_result["pack_path"], service_code + ".jar"),
-                                         target_server_path, service_code + ".jar")
-                server_port = f'--server.port={springboot_http_port}' if springboot_http_port else ''
-                jvm_params = f' {jvm_config}' if jvm_config else ''
+                if service_type == "1":
+                    # 上传java
+                    upload = shell.copy_file(os.path.join(package_result["pack_path"], service_code + ".jar"),
+                                             target_server_path, service_code + ".jar")
+                    server_port = f'--server.port={springboot_http_port}' if springboot_http_port else ''
+                    jvm_params = f' {jvm_config}' if jvm_config else ''
 
-                if upload:
-                    old_prc_id = shell.exec_cmd(
-                        f"ps -ef | grep {service_code} | grep -v grep | grep -v bash | awk" + ' \'{print $2}\'')
+                    if upload:
+                        old_prc_id = shell.exec_cmd(
+                            f"ps -ef | grep {service_code} | grep -v grep | grep -v bash | awk" + ' \'{print $2}\'')
 
-                    if old_prc_id and old_prc_id[1]:
-                        logging.info("检测到有存在的服务进程：%s", old_prc_id)
-                        shell.exec_cmd(f"kill -9 {old_prc_id[1]}")
-                        logging.info("杀死进程号：%s", old_prc_id[1])
+                        if old_prc_id and old_prc_id[1]:
+                            logging.info("检测到有存在的服务进程：%s", old_prc_id)
+                            shell.exec_cmd(f"kill -9 {old_prc_id[1]}")
+                            logging.info("杀死进程号：%s", old_prc_id[1])
 
-                    logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
-                    cmd = shell.exec_cmd(f"bash -lc \'nohup setsid java -jar {service_code + '.jar'}\' ", # {server_port} {jvm_params} > {service_code + '.log'} 2>&1 &
-                                         target_server_path)
-                    # cmd = shell.exec_cmd(f"java -version", target_server_path)
-                    # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
-                    logging.info("%s, 启动结果：%s", deploy_ip, cmd)
-                    time.sleep(5)  # 等待进程启动
-                else :
-                    logging.error("上传失败！服务：%s，目标服务器：%s，目标路径：%s", service_code, deploy_ip, target_server_path)
+                        logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
+                        cmd = shell.exec_cmd(
+                            f"nohup setsid java -jar {service_code + '.jar'} {server_port} {jvm_params} > {service_code + '.log'} 2>&1 &",
+                            target_server_path)
+                        # cmd = shell.exec_cmd(f"java -version", target_server_path)
+                        # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
+                        logging.info("%s, 启动结果：%s", deploy_ip, cmd)
+                        time.sleep(5)  # 等待进程启动
+                        send_msg(f"{service_name}，已发布到服务器：{deploy_ip}")
+                    else:
+                        err_msg = f"(上传失败！服务：{service_code}，目标服务器：{deploy_ip}，目标路径：{target_server_path})"
+                        logging.error(err_msg)
+                        raise Exception(err_msg)
+                elif service_type == "2":
+                    # 上传Vue2 Dist包到web代理服务器
+                    shell.copy_file(os.path.join(package_result["pack_path"], service_code + ".jar"),
+                                    target_server_path, service_code + ".jar")
+                    logging.info("")
+                else:
+                    logging.info(f"当前的服务serviceType不识别，service_type: {service_type}")
             except Exception as e:
                 logging.exception(e)
-            time.sleep(15)
+                # 发送通知
+                send_msg(f"{service_name}，发布失败：{deploy_ip}, 错误信息：{e}")
+
             # 关闭shell避免泄露
             shell.close_cont()
+            shell = None
 
     # for deploy_name in deploy_names:
     #     logging.info("读取mysql部署信息：%s", deploy_name)
@@ -135,26 +153,29 @@ def run():
 
     # getProjectInfo()
 
+
 """
 输入service_name，获取此服务的部署清单  List<Dict>
 """
 
 
-def getProjectInfo(service_name, project_name):
+def get_project_info(service_name, project_name, service_type: str = '1'):
     db_dict = yaml.query("base.config.db")
     logging.info("读取到base.config.db的配置为：%s", db_dict)
     # 读取mysql对应的项目配置
     dbinfo = MySQLHelper(host=db_dict["url"], user=db_dict["username"], password=db_dict["password"],
                          database=db_dict["db"]).query_to_dict(
-        query="select * from maintenance_deploy_config where service_name = %(service_name)s and project_name = %(project_name)s ",
-        params={"service_name": service_name, "project_name": project_name})
+        query="""
+                select * from maintenance_deploy_config
+                where service_name = %(service_name)s and project_name = %(project_name)s and service_type = %(service_type)s 
+               """,
+        params={"service_name": service_name, "project_name": project_name, "service_type": service_type})
     logging.info('输入serviceName: %s, 找到%s个配置项', service_name, len(dbinfo))
     logging.debug("具体配置项为：%s", dbinfo)
     return dbinfo
 
 
 """
-
 @return result:构建的java包的绝对路径地址
 """
 
@@ -168,7 +189,7 @@ def build_java_project_package():
         services = []
         for service_name in deploy_names:
             logging.info("读取mysql部署信息，serviceName:%s", service_name)
-            infos = getProjectInfo(service_name, project_name)
+            infos = get_project_info(service_name, project_name)
             services.extend(infos)
             # 遍历每一个部署信息
             for project in infos:
@@ -190,7 +211,6 @@ def build_java_project_package():
         # 直接提取去重后的id列表（保留最后出现的元素）
         unique_ids = list({item["maven_module_uri"]: None for item in services}.keys())
         logging.info("去重的结果：%s", unique_ids)
-
 
         """构建 Java 项目（支持 Maven 和 Gradle）"""
         try:
@@ -253,34 +273,38 @@ def build_java_project_package():
     else:
         logging.error("请配置deploy.java.deploy_names")
 
+
 """
-构建打包VUE项目
+    构建打包VUE项目
 """
 def build_vue_project_package():
     # 读取配置文件中的service_name
-    deploy_names = yaml.query("deploy.vue.deploy_names")
+    deploy_vue_config = yaml.query("deploy.vue")
+    deploy_names = deploy_vue_config['deploy_names']
     project_name = yaml.get("project.git.project_name")
-    logging.info("读取本次发版的vue uri为：%s, %s", deploy_names, type(deploy_names))
-    if deploy_names:
-        services = []
+    logging.info("读取本次发版的vue service_name为：%s, %s", deploy_names, type(deploy_names))
+    if deploy_vue_config and deploy_names:
         for service_name in deploy_names:
             logging.info("读取mysql中的vue部署信息，serviceName:%s", service_name)
-            infos = getProjectInfo(service_name, project_name)
+            infos = get_project_info(service_name, project_name, "2")
             if not infos:
                 logging.error("没有读取到mysql中存在对应的vue项目配置！service_name: %s", service_name)
-        try:
-            # 检查项目类型（Maven 或 Gradle）
-            if os.path.exists(os.path.join(clone_absolute_path, "package.json")):
-                logging.info("", "")
-            else:
-                logging.error("没有找到package.json文件")
-                return False
-        except Exception as e:
-            logging.exception("构建vue工程报错了，%s", e)
+            project_result_url = os.path.join(clone_absolute_path, deploy_vue_config['uri'])
+            for info in infos:
+                try:
+                    # 检查项目类型（Maven 或 Gradle）
+                    if os.path.exists(os.path.join(project_result_url, "package.json")):
+                        logging.info("在目录【%s】中找到了对应的package.json文件", project_result_url)
+                        build_cmd = ["npm", "run", f"{info.web_script}" "--registry=https://registry.npmmirror.com"]
+                    else:
+                        logging.error("没有找到package.json文件")
+                        return False
+                except Exception as e:
+                    logging.exception("构建vue工程报错了，%s", e)
 
 
 # 2.
-def cloneAndBuildProject():
+def clone_build_project():
     # 声明全局变量（需要修改的）
     global clone_absolute_path
     # 从配置文件中读取git信息
@@ -373,6 +397,16 @@ def find_maven_path() -> str:
             return path
 
     raise FileNotFoundError("未找到 Maven，请配置 MAVEN_HOME 或安装 Maven。")
+
+
+def send_msg(msg):
+    msg_type = yaml.query("message.type")
+    if msg_type == "ding_group":
+        ding_group_config = yaml.query("message.config.ding_group")
+        (DingdingGroupchat(ding_group_config['access_token'], ding_group_config['secret'])
+         .send(msg))
+    elif msg_type == "qwx":
+        logging.info("消息发送暂不支持qwx模式")
 
 
 if __name__ == '__main__':

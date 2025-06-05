@@ -6,6 +6,7 @@ base:
       username: root
       password: '000000'
       db: ry-cloud
+
 project:
   git:
     url: http://144.123.43.78:9208/gitlab/huangxupeng0831/dataplatform-ruoyi.git
@@ -30,7 +31,7 @@ deploy:
     # 测试停留
     test_delay: 20
   vue:
-    # 相对base_clone_path路径，可选，用于可以一个脚本工程同时发布前后台的场景
+    # 相对project.git.base_clone_path路径，可选，用于可以一个脚本工程同时发布前后台的场景
     uri: ruoyi-ui
     # 对应servicename
     deploy_names: vue-prod-test
@@ -38,9 +39,11 @@ deploy:
   react:
 message:
   # none/ding_group/ding/qwx/mail
-  type: ding
+  type: ding_group
   config:
     ding_group:
+      access_token: a6c6f183c0b4f411028f828728cc731d811d5d1c3e50066597d50b0a90ce6d79
+      secret: SECb0134d59803807164943ddd032314040d8588ff15635c7409a4bc899e1a45718
     ding:
     qwx:
     mail:

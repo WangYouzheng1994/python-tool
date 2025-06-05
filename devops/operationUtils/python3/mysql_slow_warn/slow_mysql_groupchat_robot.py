@@ -1,6 +1,7 @@
 #!/user/bin/env python
 # -*-coding:utf-8-*-
 # 蒙牛正式环境慢sql机器人
+import logging
 import time
 import hmac
 import hashlib
@@ -11,6 +12,8 @@ import json
 
 class DingdingGroupchat:
     def __init__(self, access_token, secret):
+        if not( access_token and secret):
+            logging.error("参数为空！access_token=%s, secret=%s", access_token, secret)
         self.access_token = access_token
         self.secret = secret
         self.url = f'https://oapi.dingtalk.com/robot/send?access_token={self.access_token}'
@@ -39,9 +42,9 @@ class DingdingGroupchat:
             r.raise_for_status()
             return r.json()
         except requests.RequestException as e:
-            print(f"请求发生错误: {e}")
+            logging.exception(f"请求发生错误: {e}")
         except Exception as e:
-            print(f"发生未知错误: {e}")
+            logging.exception(f"发生未知错误: {e}")
 
 
 if __name__ == '__main__':
