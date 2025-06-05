@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from operator import itemgetter
 from pathlib import Path
 
@@ -95,14 +96,17 @@ def run():
                         logging.info("杀死进程号：%s", old_prc_id[1])
 
                     logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
-                    cmd = shell.exec_cmd(f"nohup java -jar {service_code + '.jar'} {server_port} {jvm_params} > {service_code + '.log'} 2>&1 & ",
+                    cmd = shell.exec_cmd(f"bash -lc \'nohup setsid java -jar {service_code + '.jar'}\' ", # {server_port} {jvm_params} > {service_code + '.log'} 2>&1 &
                                          target_server_path)
+                    # cmd = shell.exec_cmd(f"java -version", target_server_path)
+                    # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
                     logging.info("%s, 启动结果：%s", deploy_ip, cmd)
+                    time.sleep(5)  # 等待进程启动
                 else :
                     logging.error("上传失败！服务：%s，目标服务器：%s，目标路径：%s", service_code, deploy_ip, target_server_path)
             except Exception as e:
                 logging.exception(e)
-
+            time.sleep(15)
             # 关闭shell避免泄露
             shell.close_cont()
 
