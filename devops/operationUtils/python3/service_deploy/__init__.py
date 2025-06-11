@@ -49,84 +49,14 @@ def run():
 
     # 2. 构建（Java And Vue）
     logging.info("开始打包Java")
-    package_result = build_java_project_package()
+    package_java_result = build_java_project_package()
+    logging.info("构建完成，准备上传Java jar到服务器, %s", package_java_result)
+    deploy_java(package_java_result)
 
-    logging.info("构建完成，准备上传Java到服务器, %s", package_result)
-    if package_result and package_result["is_success"]:
-        for package in package_result["result"]:
-            (
-                deploy_ip, deploy_ssh_port, deploy_user_name,
-                deploy_password, deploy_os_type, deploy_file_path, service_code, springboot_http_port, jvm_config
-                , service_name, service_type
-            ) = (
-                package["deploy_ip"], int(package["deploy_ssh_port"]),
-                package["deploy_user_name"], package["deploy_password"],
-                package["deploy_os_type"], package["deploy_file_path"],
-                package["service_code"], package["springboot_http_port"],
-                package["jvm_config"], package["service_name"],
-                package["service_type"]
-            )
-            deploy_base_path = package["deploy_base_path_linux"] if deploy_os_type == "1" else package[
-                "deploy_base_path_windows"]
-            deploy_file_path = deploy_file_path if deploy_file_path != None else ""
-
-            shell = contnet_shell(hostname=deploy_ip, port=deploy_ssh_port, username=deploy_user_name,
-                                  password=deploy_password)
-            # 获取目标服务器系统对应的文件路径分隔符
-            directory_separator = shell.get_directory_separator()
-            # 拼接部署根路径+ 文件相对路径
-            target_server_path = deploy_base_path + directory_separator + deploy_file_path + directory_separator
-
-            logging.info("开始上传，目标服务器：%s, service_code: %s, 本地构建目录：%s, 目标服务器地址： %s",
-                         deploy_ip,
-                         service_code,
-                         os.path.join(package_result["pack_path"], service_code + ".jar"),
-                         target_server_path + service_code)
-            try:
-                if service_type == "1":
-                    # 上传java
-                    upload = shell.copy_file(os.path.join(package_result["pack_path"], service_code + ".jar"),
-                                             target_server_path, service_code + ".jar")
-                    server_port = f'--server.port={springboot_http_port}' if springboot_http_port else ''
-                    jvm_params = f' {jvm_config}' if jvm_config else ''
-
-                    if upload:
-                        old_prc_id = shell.exec_cmd(
-                            f"ps -ef | grep {service_code} | grep -v grep | grep -v bash | awk" + ' \'{print $2}\'')
-
-                        if old_prc_id and old_prc_id[1]:
-                            logging.info("检测到有存在的服务进程：%s", old_prc_id)
-                            shell.exec_cmd(f"kill -9 {old_prc_id[1]}")
-                            logging.info("杀死进程号：%s", old_prc_id[1])
-
-                        logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
-                        cmd = shell.exec_cmd(
-                            f"nohup setsid java -jar {service_code + '.jar'} {server_port} {jvm_params} > {service_code + '.log'} 2>&1 &",
-                            target_server_path)
-                        # cmd = shell.exec_cmd(f"java -version", target_server_path)
-                        # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
-                        logging.info("%s, 启动结果：%s", deploy_ip, cmd)
-                        time.sleep(5)  # 等待进程启动
-                        send_msg(f"{service_name}，已发布到服务器：{deploy_ip}")
-                    else:
-                        err_msg = f"(上传失败！服务：{service_code}，目标服务器：{deploy_ip}，目标路径：{target_server_path})"
-                        logging.error(err_msg)
-                        raise Exception(err_msg)
-                elif service_type == "2":
-                    # 上传Vue2 Dist包到web代理服务器
-                    shell.copy_file(os.path.join(package_result["pack_path"], service_code + ".jar"),
-                                    target_server_path, service_code + ".jar")
-                    logging.info("")
-                else:
-                    logging.info(f"当前的服务serviceType不识别，service_type: {service_type}")
-            except Exception as e:
-                logging.exception(e)
-                # 发送通知
-                send_msg(f"{service_name}，发布失败：{deploy_ip}, 错误信息：{e}")
-
-            # 关闭shell避免泄露
-            shell.close_cont()
-            shell = None
+    logging.info("开始打包Vue2")
+    package_vue_result = build_vue_project_package()
+    logging.info("构建完成，准备上传Vue dist到服务器, %s", package_java_result)
+    deploy_vue(package_vue_result)
 
     # for deploy_name in deploy_names:
     #     logging.info("读取mysql部署信息：%s", deploy_name)
@@ -189,8 +119,11 @@ def build_java_project_package():
         services = []
         for service_name in deploy_names:
             logging.info("读取mysql部署信息，serviceName:%s", service_name)
-            infos = get_project_info(service_name, project_name)
-            services.extend(infos)
+            infos = get_project_info(service_name, project_name, "1")
+            if not infos :
+                logging.error("没有读取到mysql中存在对应的Java项目配置！service_name: %s", service_name)
+            else:
+                services.extend(infos)
             # 遍历每一个部署信息
             for project in infos:
                 (deploy_ip,
@@ -266,41 +199,230 @@ def build_java_project_package():
 
             logging.info("构建成功")
             logging.info("构建输出: %s", result.stdout)
-            return {"is_success": True, "result": services, "pack_path": resultUrl}
+            return {"is_success": True, "result": services}
         except subprocess.CalledProcessError as e:
             logging.exception(f"构建失败: {e.stderr}")
-            return {"is_success": False, "result": {}}
+            return {"is_success": False, "result": []}
     else:
         logging.error("请配置deploy.java.deploy_names")
+        return {"is_success": True, "result": []}
+
+
+"""
+    部署Java项目
+"""
+
+
+def deploy_java(package_java_result):
+    if package_java_result and package_java_result["is_success"]:
+        for package in package_java_result["result"]:
+            (
+                deploy_ip, deploy_ssh_port, deploy_user_name,
+                deploy_password, deploy_os_type, deploy_file_path, service_code, springboot_http_port, jvm_config
+                , service_name, service_type
+            ) = (
+                package["deploy_ip"], int(package["deploy_ssh_port"]),
+                package["deploy_user_name"], package["deploy_password"],
+                package["deploy_os_type"], package["deploy_file_path"],
+                package["service_code"], package["springboot_http_port"],
+                package["jvm_config"], package["service_name"],
+                package["service_type"]
+            )
+            deploy_base_path = package["deploy_base_path_linux"] if deploy_os_type == "1" else package[
+                "deploy_base_path_windows"]
+            deploy_file_path = deploy_file_path if deploy_file_path != None else ""
+
+            shell = contnet_shell(hostname=deploy_ip, port=deploy_ssh_port, username=deploy_user_name,
+                                  password=deploy_password)
+            # 获取目标服务器系统对应的文件路径分隔符
+            directory_separator = shell.get_directory_separator()
+            # 拼接部署根路径+ 文件相对路径
+            target_server_path = deploy_base_path + directory_separator + deploy_file_path + directory_separator
+
+            logging.info("开始上传，目标服务器：%s, service_code: %s, 本地构建目录：%s, 目标服务器地址： %s",
+                         deploy_ip,
+                         service_code,
+                         os.path.join(clone_absolute_path, "dist", service_code + ".jar"),
+                         target_server_path + service_code)
+            try:
+                if service_type == "1":
+                    # 上传java
+                    upload = shell.copy_file(os.path.join(clone_absolute_path, "dist", service_code + ".jar"),
+                                             target_server_path, service_code + ".jar")
+                    server_port = f'--server.port={springboot_http_port}' if springboot_http_port else ''
+                    jvm_params = f' {jvm_config}' if jvm_config else ''
+
+                    if upload:
+                        old_prc_id = shell.exec_cmd(
+                            f"ps -ef | grep {service_code} | grep -v grep | grep -v bash | awk" + ' \'{print $2}\'')
+
+                        if old_prc_id and old_prc_id[1]:
+                            logging.info("检测到有存在的服务进程：%s", old_prc_id)
+                            shell.exec_cmd(f"kill -9 {old_prc_id[1]}")
+                            logging.info("杀死进程号：%s", old_prc_id[1])
+
+                        logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
+                        cmd = shell.exec_cmd(
+                            f"nohup setsid java -jar {service_code + '.jar'} {server_port} {jvm_params} > {service_code + '.log'} 2>&1 &",
+                            target_server_path)
+                        # cmd = shell.exec_cmd(f"java -version", target_server_path)
+                        # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
+                        logging.info("%s, 启动结果：%s", deploy_ip, cmd)
+                        time.sleep(5)  # 等待进程启动
+                        send_msg(f"{service_name}，已发布到服务器：{deploy_ip}")
+                    else:
+                        err_msg = f"(上传失败！服务：{service_code}，目标服务器：{deploy_ip}，目标路径：{target_server_path})"
+                        logging.error(err_msg)
+                        raise Exception(err_msg)
+                else:
+                    logging.info(f"当前的服务serviceType不识别，service_type: {service_type}")
+            except Exception as e:
+                logging.exception(e)
+                # 发送通知
+                send_msg(f"{service_name}，发布失败：{deploy_ip}, 错误信息：{e}")
+
+            # 关闭shell避免泄露
+            shell.close_cont()
+            shell = None
+    else:
+        logging.info("没有接收到正确的java打包信息：%s", package_java_result)
 
 
 """
     构建打包VUE项目
 """
+
+
 def build_vue_project_package():
     # 读取配置文件中的service_name
     deploy_vue_config = yaml.query("deploy.vue")
     deploy_names = deploy_vue_config['deploy_names']
     project_name = yaml.get("project.git.project_name")
     logging.info("读取本次发版的vue service_name为：%s, %s", deploy_names, type(deploy_names))
+
+
+    # if deploy_names and type(deploy_names) is str:
+    #     logging.info("读取mysql中的vue部署信息，serviceName:%s", service_name)
+    #     infos = get_project_info(deploy_names, project_name, "2")
+
     if deploy_vue_config and deploy_names:
+        services = []
         for service_name in deploy_names:
             logging.info("读取mysql中的vue部署信息，serviceName:%s", service_name)
             infos = get_project_info(service_name, project_name, "2")
             if not infos:
                 logging.error("没有读取到mysql中存在对应的vue项目配置！service_name: %s", service_name)
-            project_result_url = os.path.join(clone_absolute_path, deploy_vue_config['uri'])
-            for info in infos:
-                try:
-                    # 检查项目类型（Maven 或 Gradle）
-                    if os.path.exists(os.path.join(project_result_url, "package.json")):
-                        logging.info("在目录【%s】中找到了对应的package.json文件", project_result_url)
-                        build_cmd = ["npm", "run", f"{info.web_script}" "--registry=https://registry.npmmirror.com"]
+            else:
+                services.extend(infos)
+
+        # 直接提取去重后的id列表（保留最后出现的元素）
+        unique_ids = list({item["service_code"]: None for item in services}.keys())
+
+        project_result_url = os.path.join(clone_absolute_path, deploy_vue_config['uri'])
+        for info in infos:
+            try:
+                # 检查项目类型（package.json文件）
+                if os.path.exists(os.path.join(project_result_url, "package.json")):
+                    logging.info("在目录【%s】中找到了对应的package.json文件", project_result_url)
+                    build_cmd = ["yum install -y zip &&", " npm", "run",
+                                 f"{info['web_script']}" "--registry=https://registry.npmmirror.com"]
+
+                    result = subprocess.run(
+                        " ".join(build_cmd),
+                        cwd=project_result_url,
+                        shell=True,
+                        check=True,
+                        text=True,
+                        capture_output=True
+                    )
+
+                    logging.info("构建输出: %s", result.stdout)
+                    if not os.path.exists(os.path.join(project_result_url, "dist.zip")):
+                        logging.info("构建成功")
+                        return {"is_success": True, "result": services}
                     else:
-                        logging.error("没有找到package.json文件")
-                        return False
-                except Exception as e:
-                    logging.exception("构建vue工程报错了，%s", e)
+                        logging.error("没有找到对应的vue工程dist文件！")
+                else:
+                    logging.error("没有找到package.json文件")
+                    return {"is_success": False, "result": []}
+            except Exception as e:
+                logging.exception("构建vue工程报错了，%s", e)
+
+
+"""
+    部署VUE项目
+"""
+
+
+def deploy_vue(package_vue_result):
+    deploy_vue_config = yaml.query("deploy.vue")
+    if package_vue_result and package_vue_result["is_success"]:
+        for package in package_vue_result["result"]:
+            (
+                deploy_ip, deploy_ssh_port, deploy_user_name,
+                deploy_password, deploy_os_type, deploy_file_path, service_code, springboot_http_port, jvm_config
+                , service_name, service_type
+            ) = (
+                package["deploy_ip"], int(package["deploy_ssh_port"]),
+                package["deploy_user_name"], package["deploy_password"],
+                package["deploy_os_type"], package["deploy_file_path"],
+                package["service_code"], package["springboot_http_port"],
+                package["jvm_config"], package["service_name"],
+                package["service_type"]
+            )
+            deploy_base_path = package["deploy_base_path_linux"] if deploy_os_type == "1" else package[
+                "deploy_base_path_windows"]
+            deploy_file_path = deploy_file_path if deploy_file_path != None else ""
+
+            shell = contnet_shell(hostname=deploy_ip, port=deploy_ssh_port, username=deploy_user_name,
+                                  password=deploy_password)
+            # 获取目标服务器系统对应的文件路径分隔符
+            directory_separator = shell.get_directory_separator()
+            # 拼接部署根路径+ 文件相对路径
+            target_server_path = deploy_base_path + directory_separator + deploy_file_path + directory_separator
+
+            logging.info("开始上传，目标服务器：%s, service_code: %s, 本地构建目录：%s, 目标服务器地址： %s",
+                         deploy_ip,
+                         service_code,
+                         os.path.join(clone_absolute_path, "dist", service_code + ".jar"),
+                         target_server_path + service_code)
+            try:
+                if service_type == "2":
+                    command = 'nginx'
+                    if not package['web_proxy_server_path']:
+                        command = package['web_proxy_server_path']
+                    exec_cmd = shell.exec_cmd(f'{command} -version')
+                    if exec_cmd.out_res.find('nginx') == '-1':
+                        raise Exception(f'没有找到对应的nginx路径，执行结果为：{exec_cmd}')
+
+                    # 上传Vue2 Dist包到web代理服务器
+                    upload = shell.copy_file(os.path.join(clone_absolute_path, deploy_vue_config['uri'], "dist.zip"),
+                                    target_server_path, "dist.zip")
+                    logging.info(f"已经将文件从【{os.path.join(clone_absolute_path, deploy_vue_config['uri'], 'dist.zip')}】，上送到{target_server_path}目录下")
+
+                    if upload:
+                        logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
+                        cmd = shell.exec_cmd(f'{command} -s reload')
+                        # cmd = shell.exec_cmd(f"java -version", target_server_path)
+                        # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
+                        logging.info("%s, 启动结果：%s", deploy_ip, cmd)
+                        send_msg(f"{service_name}，已发布到服务器：{deploy_ip}")
+                    else:
+                        err_msg = f"(上传失败！服务：{service_code}，目标服务器：{deploy_ip}，目标路径：{target_server_path})"
+                        logging.error(err_msg)
+                        raise Exception(err_msg)
+                else:
+                    logging.info(f"当前的服务serviceType不识别，service_type: {service_type}")
+            except Exception as e:
+                logging.exception(e)
+                # 发送通知
+                send_msg(f"{service_name}，发布失败：{deploy_ip}, 错误信息：{e}")
+
+            # 关闭shell避免泄露
+            shell.close_cont()
+            shell = None
+    else:
+        logging.info("没有接收到正确的vue打包信息：%s", package_vue_result)
 
 
 # 2.

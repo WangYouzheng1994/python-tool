@@ -35,7 +35,6 @@ deploy:
     uri: ruoyi-ui
     # 对应servicename
     deploy_names: vue-prod-test
-
   react:
 message:
   # none/ding_group/ding/qwx/mail

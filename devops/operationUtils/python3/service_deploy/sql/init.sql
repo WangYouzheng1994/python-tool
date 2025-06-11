@@ -12,11 +12,12 @@ CREATE TABLE `maintenance_deploy_config` (
   `deploy_base_path_windows` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '项目基础路径windows',
   `deploy_base_path_linux` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '项目基础路径linux',
   `deploy_file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '相对部署路径',
-  `service_type` char(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '1' COMMENT '1:java;2:前端vue2',
+  `service_type` char(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '1' COMMENT '1:java;2:前端vue2',
   `deploy_user_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '账号',
   `deploy_password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '密码',
   `springboot_http_port` int DEFAULT NULL COMMENT 'springboot服务端口号，对应maven的Dserver.port',
   `web_script` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'vue项目要运行的脚本id',
+  `web_proxy_server_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '前端反向代理服务器地址（避免没有环境变量用）',
   `use_flag` char(2) COLLATE utf8mb4_general_ci NOT NULL DEFAULT '0' COMMENT '实例状态：0启用，1禁用',
   `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
   `create_by` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '创建人',
@@ -25,5 +26,5 @@ CREATE TABLE `maintenance_deploy_config` (
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '上次修改时间',
   `del_flag` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除(0 未删除  1已删除)',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_service_instance` (`service_code`,`instance_no`) COMMENT '服务+实例唯一'
+  UNIQUE KEY `uk_service_instance` (`service_name`,`service_code`,`instance_no`) USING BTREE COMMENT '服务+实例唯一'
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='运维中心，部署机器清单';
