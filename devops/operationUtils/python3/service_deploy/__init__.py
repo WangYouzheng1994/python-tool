@@ -391,20 +391,21 @@ def deploy_vue(package_vue_result):
             try:
                 if service_type == "2":
                     command = 'nginx'
-                    if not package['web_proxy_server_path']:
+                    if package['web_proxy_server_path']:
                         command = package['web_proxy_server_path']
                     exec_cmd = shell.exec_cmd(f'{command} -version')
-                    if exec_cmd.out_res.find('nginx') == '-1':
+                    if exec_cmd and exec_cmd[1].find('nginx') == '-1':
                         raise Exception(f'没有找到对应的nginx路径，执行结果为：{exec_cmd}')
+
+                    logging.info(f"将文件从【{os.path.join(clone_absolute_path, deploy_vue_config['uri'], 'dist.zip')}】，上送到目标服务器{deploy_ip}, {target_server_path}目录下")
 
                     # 上传Vue2 Dist包到web代理服务器
                     upload = shell.copy_file(os.path.join(clone_absolute_path, deploy_vue_config['uri'], "dist.zip"),
                                              target_server_path, "dist.zip")
-                    logging.info(
-                        f"已经将文件从【{os.path.join(clone_absolute_path, deploy_vue_config['uri'], 'dist.zip')}】，上送到{target_server_path}目录下")
 
                     if upload:
                         logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
+                        shell.exec_cmd('yum -y install zip && unzip -o dist.zip ', target_server_path)
                         cmd = shell.exec_cmd(f'{command} -s reload')
                         # cmd = shell.exec_cmd(f"java -version", target_server_path)
                         # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
