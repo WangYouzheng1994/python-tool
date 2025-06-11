@@ -6,7 +6,7 @@ import subprocess
 from getpass import getpass
 from pathlib import Path
 
-from devops.operationUtils.python3.util.mysql_pool_utils import  MySQLHelper
+from devops.operationUtils.python3.util.mysql_pool_utils import MySQLHelper
 from devops.operationUtils.python3.util.yaml_utils import YamlUtils
 
 
@@ -25,9 +25,11 @@ class GitUtils:
         self.project_name = project_name
         self.build_base_path = build_base_path
         self.instance_id = str(instance_id)
+
     """
     拉取项目
     """
+
     # def getProjectByHttp(self, projectNames=[], moduleName=None):
     #     self.get_git_credentials()
     #     if not projectNames:
@@ -44,12 +46,11 @@ class GitUtils:
     #                     self.build_java_project()
     #                     for project_db_info in project_db_infos:
     #                          print()
-        # else:
-        #     for project in projectNames:
-        #         print(project)
+    # else:
+    #     for project in projectNames:
+    #         print(project)
 
-        # self.build_java_project()
-
+    # self.build_java_project()
 
     def getProjectInfo(self, service_name):
         # 读取mysql对应的项目配置
@@ -62,6 +63,7 @@ class GitUtils:
     """
     获取Git认证信息
     """
+
     def get_git_credentials(self, auth_method=1):
         """获取Git认证信息（支持HTTPS和SSH）"""
         # auth_method = input("选择认证方式 (1=HTTPS, 2=SSH): ")
@@ -73,6 +75,7 @@ class GitUtils:
             return {"method": "ssh"}
 
     def clone_java_project(self, credentials=None, branch='master'):
+        if not branch: branch = 'master'
         """从 Git 拉取 Java 项目"""
         try:
             # 处理HTTPS认证
@@ -86,7 +89,8 @@ class GitUtils:
                 auth_url = self.git_url
 
             # 创建目标目录（如果不存在）
-            logging.info("clone_absolute_path，项目克隆目录为： %s,%s,%s", self.build_base_path, self.project_name, self.instance_id)
+            logging.info("clone_absolute_path，项目克隆目录为： %s,%s,%s", self.build_base_path, self.project_name,
+                         self.instance_id)
             clone_absolute_path = os.path.join(self.build_base_path, self.project_name, self.instance_id)
             Path(clone_absolute_path).mkdir(parents=True, exist_ok=True)
 

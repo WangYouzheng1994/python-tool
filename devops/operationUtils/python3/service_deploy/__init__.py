@@ -120,7 +120,7 @@ def build_java_project_package():
         for service_name in deploy_names:
             logging.info("读取mysql部署信息，serviceName:%s", service_name)
             infos = get_project_info(service_name, project_name, "1")
-            if not infos :
+            if not infos:
                 logging.error("没有读取到mysql中存在对应的Java项目配置！service_name: %s", service_name)
             else:
                 services.extend(infos)
@@ -300,53 +300,55 @@ def build_vue_project_package():
     project_name = yaml.get("project.git.project_name")
     logging.info("读取本次发版的vue service_name为：%s, %s", deploy_names, type(deploy_names))
 
+    if deploy_names and type(deploy_names) is str:
+        logging.info("读取mysql中的vue部署信息，serviceName:%s", deploy_names)
+        infos = get_project_info(deploy_names, project_name, "2")
 
-    # if deploy_names and type(deploy_names) is str:
-    #     logging.info("读取mysql中的vue部署信息，serviceName:%s", service_name)
-    #     infos = get_project_info(deploy_names, project_name, "2")
-
-    if deploy_vue_config and deploy_names:
-        services = []
-        for service_name in deploy_names:
-            logging.info("读取mysql中的vue部署信息，serviceName:%s", service_name)
-            infos = get_project_info(service_name, project_name, "2")
-            if not infos:
-                logging.error("没有读取到mysql中存在对应的vue项目配置！service_name: %s", service_name)
-            else:
-                services.extend(infos)
-
-        # 直接提取去重后的id列表（保留最后出现的元素）
-        unique_ids = list({item["service_code"]: None for item in services}.keys())
+        if not infos or len(infos) == 0:
+            logging.error("没有读取到mysql中存在对应的vue项目配置！service_name: %s", deploy_names)
+            return {"is_success": False, "result": []}
 
         project_result_url = os.path.join(clone_absolute_path, deploy_vue_config['uri'])
-        for info in infos:
-            try:
-                # 检查项目类型（package.json文件）
-                if os.path.exists(os.path.join(project_result_url, "package.json")):
-                    logging.info("在目录【%s】中找到了对应的package.json文件", project_result_url)
-                    build_cmd = ["yum install -y zip &&", " npm", "run",
-                                 f"{info['web_script']}" "--registry=https://registry.npmmirror.com"]
+        info = infos[0]
+        try:
+            # 检查项目类型（package.json文件）
+            if os.path.exists(os.path.join(project_result_url, "package.json")):
+                logging.info("在目录【%s】中找到了对应的package.json文件", project_result_url)
+                build_step_one_cmd = ["npm install"]
+                logging.info("开始执行构建动作，构建命令：%s", build_step_one_cmd)
+                build_step_two_cmd = ["npm", "run", f"{info['web_script']}", "--registry=https://registry.npmmirror.com"]
 
-                    result = subprocess.run(
-                        " ".join(build_cmd),
-                        cwd=project_result_url,
-                        shell=True,
-                        check=True,
-                        text=True,
-                        capture_output=True
-                    )
+                step_one_result = subprocess.run(
+                    " ".join(build_step_one_cmd),
+                    cwd=project_result_url,
+                    shell=True,
+                    check=True,
+                    text=True,
+                    capture_output=True
+                )
+                logging.info("step_one_result构建输出: %s，异常：%s", step_one_result.stdout, step_one_result.stderr)
 
-                    logging.info("构建输出: %s", result.stdout)
-                    if not os.path.exists(os.path.join(project_result_url, "dist.zip")):
-                        logging.info("构建成功")
-                        return {"is_success": True, "result": services}
-                    else:
-                        logging.error("没有找到对应的vue工程dist文件！")
+                logging.info("开始执行step_two: %s", build_step_two_cmd)
+                step_two_result = subprocess.run(
+                    " ".join(build_step_two_cmd),
+                    cwd=project_result_url,
+                    shell=True,
+                    check=True,
+                    text=True,
+                    capture_output=True
+                )
+                logging.info("step_two_result构建输出: %s", step_two_result.stdout)
+
+                if os.path.exists(os.path.join(project_result_url, "dist.zip")):
+                    logging.info("构建成功")
+                    return {"is_success": True, "result": infos}
                 else:
-                    logging.error("没有找到package.json文件")
-                    return {"is_success": False, "result": []}
-            except Exception as e:
-                logging.exception("构建vue工程报错了，%s", e)
+                    logging.error("没有找到对应的vue工程dist文件！")
+            else:
+                logging.error("没有找到package.json文件")
+                return {"is_success": False, "result": []}
+        except Exception as e:
+            logging.exception("构建vue工程报错了，%s", e)
 
 
 """
@@ -384,7 +386,7 @@ def deploy_vue(package_vue_result):
             logging.info("开始上传，目标服务器：%s, service_code: %s, 本地构建目录：%s, 目标服务器地址： %s",
                          deploy_ip,
                          service_code,
-                         os.path.join(clone_absolute_path, "dist", service_code + ".jar"),
+                         os.path.join(clone_absolute_path, deploy_vue_config['uri'], "dist.zip"),
                          target_server_path + service_code)
             try:
                 if service_type == "2":
@@ -397,8 +399,9 @@ def deploy_vue(package_vue_result):
 
                     # 上传Vue2 Dist包到web代理服务器
                     upload = shell.copy_file(os.path.join(clone_absolute_path, deploy_vue_config['uri'], "dist.zip"),
-                                    target_server_path, "dist.zip")
-                    logging.info(f"已经将文件从【{os.path.join(clone_absolute_path, deploy_vue_config['uri'], 'dist.zip')}】，上送到{target_server_path}目录下")
+                                             target_server_path, "dist.zip")
+                    logging.info(
+                        f"已经将文件从【{os.path.join(clone_absolute_path, deploy_vue_config['uri'], 'dist.zip')}】，上送到{target_server_path}目录下")
 
                     if upload:
                         logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
@@ -437,8 +440,9 @@ def clone_build_project():
                    password=git_info['password'],
                    build_base_path=git_info['base_clone_path'],
                    instance_id=git_info['version'],
-                   project_name=git_info['project_name'])
-    clone_absolute_path = git.clone_java_project(git.get_git_credentials(), 'dev')
+                   project_name=git_info['project_name']
+                   )
+    clone_absolute_path = git.clone_java_project(git.get_git_credentials(), git_info['branch'])
 
 
 # 3. 根据项目类型，执行构建
