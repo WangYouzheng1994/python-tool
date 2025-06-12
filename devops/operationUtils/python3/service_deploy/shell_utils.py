@@ -4,6 +4,7 @@ import logging
 import time
 
 import paramiko
+import select
 
 
 class contnet_shell:
@@ -88,7 +89,7 @@ class contnet_shell:
     path: 默认为空，如果不为空，需要切换目录
     """
 
-    def exec_cmd(self, cmd, path=None):
+    def exec_cmd(self, cmd, path=None, timeout=30):
         path = f"cd {path} &&" if path else ""
         if path:
             logging.info("执行命令前，进行路径跳转：%s", path)
@@ -98,28 +99,54 @@ class contnet_shell:
         stdin, stdout, stderr = self._ssh_fd.exec_command(path + cmd, get_pty=False)
         out_res = ''
         err_res = ''
-        if stdout.channel.recv_exit_status() != 0:
-            for line in stdout.readlines():
-                logging.info(line)
-                out_res += line
-        else:
-            for line in stderr.readlines():
-                logging.info(line)
-                err_res += line
-        exit_status = stdout.channel.recv_exit_status()
 
-        # if stdout.channel.recv_exit_status() != 0:
-        #     for line in stderr.readlines():
-        #         logging.info(line)
-        #         res += line
-        #     return False, res
-        # else:
-        #     for line in stdout.readlines():
-        #         logging.info(line)
-        #         res += line
-        #     return True, res
+        channel = stdout.channel
+
+        # 禁用通道的阻塞模式（可选）
+        channel.settimeout(timeout)
+
+        # 存储输出
+        stdout_data = b""
+        stderr_data = b""
+
+        # 开始时间
+        start_time = time.time()
+
+        # 轮询输出，直到命令执行完毕或超时
+        while not channel.exit_status_ready():
+            # 检查是否超时
+            if time.time() - start_time > 30:
+                channel.close()
+                return None, "", f"命令执行超时 ({timeout}s)"
+
+            # 使用 select 检查是否有数据可读
+            readable, _, _ = select.select([channel], [], [], 1)
+
+            if channel in readable:
+                # 读取 stdout
+                if channel.recv_ready():
+                    stdout_data += channel.recv(4096)
+
+                # 读取 stderr
+                if channel.recv_stderr_ready():
+                    stderr_data += channel.recv_stderr(4096)
+
+        # 读取剩余输出
+        if channel.recv_ready():
+            stdout_data += channel.recv(4096)
+
+        if channel.recv_stderr_ready():
+            stderr_data += channel.recv_stderr(4096)
+
+        # 获取退出状态
+        exit_status = channel.recv_exit_status()
+
+        # 解码输出
+        stdout_text = stdout_data.decode('utf-8', errors='replace')
+        stderr_text = stderr_data.decode('utf-8', errors='replace')
+
         logging.info("命令执行结果，out:%s, err:%s, exit_status: %s", out_res, err_res, exit_status)
-        return (exit_status == 0, out_res, err_res)
+        return (exit_status == 0, stdout_text, stderr_text)
 
     def yum(self, cmd):
         cmd = cmd + '\n'  # 加一个回车键
