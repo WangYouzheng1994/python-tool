@@ -316,7 +316,8 @@ def build_vue_project_package():
                 logging.info("在目录【%s】中找到了对应的package.json文件", project_result_url)
                 build_step_one_cmd = ["npm install"]
                 logging.info("开始执行构建动作，构建命令：%s", build_step_one_cmd)
-                build_step_two_cmd = ["npm", "run", f"{info['web_script']}", "--registry=https://registry.npmmirror.com"]
+                build_step_two_cmd = ["npm", "run", f"{info['web_script']}",
+                                      "--registry=https://registry.npmmirror.com"]
 
                 step_one_result = subprocess.run(
                     " ".join(build_step_one_cmd),
@@ -397,7 +398,8 @@ def deploy_vue(package_vue_result):
                     if exec_cmd and exec_cmd[1].find('nginx') == '-1':
                         raise Exception(f'没有找到对应的nginx路径，执行结果为：{exec_cmd}')
 
-                    logging.info(f"将文件从【{os.path.join(clone_absolute_path, deploy_vue_config['uri'], 'dist.zip')}】，上送到目标服务器{deploy_ip}, {target_server_path}目录下")
+                    logging.info(
+                        f"将文件从【{os.path.join(clone_absolute_path, deploy_vue_config['uri'], 'dist.zip')}】，上送到目标服务器{deploy_ip}, {target_server_path}目录下")
 
                     # 上传Vue2 Dist包到web代理服务器
                     upload = shell.copy_file(os.path.join(clone_absolute_path, deploy_vue_config['uri'], "dist.zip"),
