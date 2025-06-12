@@ -9,12 +9,9 @@ import time
 from operator import itemgetter
 from pathlib import Path
 
-import proc
-
 from devops.operationUtils.python3.mysql_slow_warn.slow_mysql_groupchat_robot import DingdingGroupchat
 from devops.operationUtils.python3.service_deploy.git_utils import GitUtils
 from devops.operationUtils.python3.service_deploy.shell_utils import contnet_shell
-from devops.operationUtils.python3.util.http_utils import HttpUtils
 from devops.operationUtils.python3.util.mysql_pool_utils import MySQLHelper
 from devops.operationUtils.python3.util.yaml_utils import YamlUtils
 
@@ -96,9 +93,12 @@ def get_project_info(service_name, project_name, service_type: str = '1'):
     dbinfo = MySQLHelper(host=db_dict["url"], user=db_dict["username"], password=db_dict["password"],
                          database=db_dict["db"]).query_to_dict(
         query="""
-                select * from maintenance_deploy_config
-                where service_name = %(service_name)s and project_name = %(project_name)s and service_type = %(service_type)s 
-               """,
+              select *
+              from maintenance_deploy_config
+              where service_name = %(service_name)s
+                and project_name = %(project_name)s
+                and service_type = %(service_type)s
+              """,
         params={"service_name": service_name, "project_name": project_name, "service_type": service_type})
     logging.info('输入serviceName: %s, 找到%s个配置项', service_name, len(dbinfo))
     logging.debug("具体配置项为：%s", dbinfo)
