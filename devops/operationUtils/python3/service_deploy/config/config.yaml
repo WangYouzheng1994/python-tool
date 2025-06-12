@@ -13,7 +13,7 @@ project:
     username: root
     password: wyz123!@#
     # git clone basepath
-    base_clone_path: C:\\test2
+    base_clone_path: E:\alp\project\mengniu
     project_name: opsyndex-mengniu
     version: 1.0
 

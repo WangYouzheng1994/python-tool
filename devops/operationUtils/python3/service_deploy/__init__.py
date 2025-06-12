@@ -9,8 +9,6 @@ import time
 from operator import itemgetter
 from pathlib import Path
 
-import proc
-
 from devops.operationUtils.python3.mysql_slow_warn.slow_mysql_groupchat_robot import DingdingGroupchat
 from devops.operationUtils.python3.service_deploy.git_utils import GitUtils
 from devops.operationUtils.python3.service_deploy.shell_utils import contnet_shell
