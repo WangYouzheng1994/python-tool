@@ -90,13 +90,14 @@ class contnet_shell:
     """
 
     def exec_cmd(self, cmd, path=None, timeout=30):
+        prefix = "source /etc/profile && "
         path = f"cd {path} &&" if path else ""
         if path:
             logging.info("执行命令前，进行路径跳转：%s", path)
             # self._ssh_fd.exec_command(f"cd {path}", get_pty=True)
 
         logging.info("执行远程命令：%s", cmd)
-        stdin, stdout, stderr = self._ssh_fd.exec_command(path + cmd, get_pty=False)
+        stdin, stdout, stderr = self._ssh_fd.exec_command(prefix + path + cmd, get_pty=False)
         out_res = ''
         err_res = ''
 

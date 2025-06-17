@@ -91,7 +91,7 @@ def get_project_info(service_name, project_name, service_type: str = '1'):
     logging.info("读取到base.config.db的配置为：%s", db_dict)
     # 读取mysql对应的项目配置
     dbinfo = MySQLHelper(host=db_dict["url"], user=db_dict["username"], password=db_dict["password"],
-                         database=db_dict["db"]).query_to_dict(
+                         database=db_dict["db"], port=db_dict["port"]).query_to_dict(
         query="""
               select *
               from maintenance_deploy_config
