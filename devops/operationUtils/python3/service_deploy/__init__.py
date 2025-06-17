@@ -99,8 +99,7 @@ def run():
 
                         logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
                         cmd = shell.exec_cmd(
-                            f"nohup setsid java -jar {service_code + '.jar'} {server_port} {jvm_params} > {service_code + '.log'} 2>&1 &",
-                            target_server_path)
+                            f"nohup setsid java -jar {target_server_path + service_code + '.jar'} {server_port}{jvm_params} > {target_server_path + service_code + server_port +'.log'} 2>&1 &")
                         # cmd = shell.exec_cmd(f"java -version", target_server_path)
                         # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
                         logging.info("%s, 启动结果：%s", deploy_ip, cmd)
@@ -215,7 +214,7 @@ def build_java_project_package():
             # 检查项目类型（Maven 或 Gradle）
             if os.path.exists(os.path.join(clone_absolute_path, "pom.xml")):
                 logging.info("输入的deploynames: %s, 标识位: %s", deploy_names, unique_ids)
-                build_cmd = ["mvn", "clean", "package -am -pl", ",".join(unique_ids)]
+                build_cmd = ["mvn", "clean", "package -am -pl", ",".join(unique_ids), "-P uat"]
                 logging.info("检测到 Maven 项目")
                 resultUrl = os.path.join(clone_absolute_path, "dist")
             # elif os.path.exists(os.path.join(self.project_dir, "build.gradle")) or \

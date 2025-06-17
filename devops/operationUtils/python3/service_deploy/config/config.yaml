@@ -2,10 +2,10 @@
 base:
   config:
     db:
-      url: 192.168.0.69
+      url: 127.0.0.1
       username: root
-      password: '000000'
-      db: ry-cloud
+      password: 'root'
+      db: deploy
 
 project:
   git:
