@@ -150,7 +150,7 @@ def build_java_project_package():
             # 检查项目类型（Maven 或 Gradle）
             if os.path.exists(os.path.join(clone_absolute_path, "pom.xml")):
                 logging.info("输入的deploynames: %s, 标识位: %s", deploy_names, unique_ids)
-                build_cmd = ["mvn", "clean", "package -am -pl", ",".join(unique_ids)]
+                build_cmd = ["mvn", "clean", "package -am -pl", ",".join(unique_ids), "-Pprod"]
                 logging.info("检测到 Maven 项目")
                 resultUrl = os.path.join(clone_absolute_path, "dist")
             # elif os.path.exists(os.path.join(self.project_dir, "build.gradle")) or \
