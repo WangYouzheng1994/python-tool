@@ -2,16 +2,11 @@
 base:
   config:
     db:
-#      url: 192.168.0.69
-#      username: root
-#      password: '000000'
-#      db: ry-cloud
-      # 蒙牛测试UAT
-      url: 10.210.64.14
-      port: 3316
+      url: 192.168.0.69
+      port: 3306
       username: root
-      password: 'tLP0eC#12%.A'
-      db: deploy
+      password: '000000'
+      db: ry-cloud
 
 project:
   git:
@@ -19,9 +14,9 @@ project:
     username: root
     password: wyz123!@#
     # 代码分支-默认master
-    branch: dev
+    branch: feature/dev-20250628-publish
     # git clone basepath
-    base_clone_path: C:\\test2
+    base_clone_path: E:\alp\project\mengniu
     project_name: opsyndex-mengniu
     version: 1.0
 
@@ -33,8 +28,23 @@ deploy:
     uri:
     # 对应servicename
     deploy_names:
-      - opsyndex-auth-a
-      - opsyndex-auth-b
+#      - opsyndex-auth-test
+#      - opsyndex-gateway-test
+#      - opsyndex-system-test
+#      - opsyndex-message-center-test
+      - service-data-dts-test
+#      - opsyndex-form-design-test
+#      - opsyndex-document-test
+#      - opsyndex-flow-realise-test
+#      - opsyndex-download-center-test
+#      - opsyndex-dataquality-test
+      - data-metadata-service-test
+      - data-metadata-service-console-test
+      - data-market-service-test
+      - data-market-service-mapping-test
+#      - opsyndex-file-test
+#      - mengniu-api-test
+#      - opsyndex-rule-engine-test
     # id模式，定向发布，目前没有实现，给未来定向发布预留
     deploy_id:
     # 测试停留
