@@ -9,7 +9,7 @@ from devops.operationUtils.python3.mysql_slow_warn.slow_mysql_groupchat_robot im
 sample_set = names = {
     "唐宇", "赵树全", "石磊", "卢帅", "乔通",
     "刘宝航", "刘宇航", "刁沛森", "冯俊杰", "江春阳",
-    "史家鑫", "李兆旭", "黄绪鹏", "刘卫航", "朱涛"
+     "李兆旭", "黄绪鹏", "刘卫航", "朱涛"
 }
 
 
