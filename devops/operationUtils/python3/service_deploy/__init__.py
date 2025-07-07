@@ -407,7 +407,7 @@ def deploy_vue(package_vue_result):
 
                     if upload:
                         logging.info("%s,准备启动服务：%s", deploy_ip, service_code)
-                        shell.exec_cmd('yum -y install zip && unzip -o dist.zip ', target_server_path)
+                        shell.exec_cmd('sudo yum -y install zip && unzip -o dist.zip ', target_server_path)
                         cmd = shell.exec_cmd(f'{command} -s reload')
                         # cmd = shell.exec_cmd(f"java -version", target_server_path)
                         # cmd = shell.exec_cmd(f"bash -lc \'java -jar {service_code + '.jar'} \' ", target_server_path)
