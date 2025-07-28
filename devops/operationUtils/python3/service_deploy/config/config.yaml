@@ -7,10 +7,10 @@ base:
 #      password: '000000'
 #      db: ry-cloud
       # 蒙牛测试UAT
-      url: 10.210.64.14
-      port: 3316
+      url: 10.210.3.21
+      port: 3326
       username: root
-      password: 'tLP0eC#12%.A'
+      password: 'y90b(Yy6'
       db: deploy
 
 project:
@@ -21,7 +21,7 @@ project:
     # 代码分支-默认master
     branch: dev
     # git clone basepath
-    base_clone_path: C:\\test2
+    base_clone_path: E:\alp\project\mengniu
     project_name: opsyndex-mengniu
     version: 1.0
 
@@ -33,8 +33,15 @@ deploy:
     uri:
     # 对应servicename
     deploy_names:
-      - opsyndex-auth-a
-      - opsyndex-auth-b
+#      - opsyndex-document
+#      - data-market-service
+      - opsyndex-message-center
+#      - opsyndex-gateway
+#      - opsyndex-document
+#      - service-data-dts
+      - opsyndex-flow-realise
+      - opsyndex-form-design
+
     # id模式，定向发布，目前没有实现，给未来定向发布预留
     deploy_id:
     # 测试停留
@@ -49,7 +56,7 @@ deploy:
     # 相对project.git.base_clone_path路径，可选，用于可以一个脚本工程同时发布前后台的场景
     uri: ruoyi-ui
     # 对应servicename
-    deploy_names:
+    deploy_names: vue-prod
     # TODO: 清空node_modules和package-lock去构建，避免有稀奇古怪的问题。
     clean_build: false
   react:

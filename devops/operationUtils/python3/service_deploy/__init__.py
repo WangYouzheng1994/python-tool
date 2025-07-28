@@ -253,6 +253,7 @@ def deploy_java(package_java_result):
                     jvm_params = f' {jvm_config}' if jvm_config else ''
 
                     if upload:
+                        shell.exec_cmd(f"sudo -i")
                         old_prc_id = shell.exec_cmd(
                             f"ps -ef | grep {service_code} | grep -v grep | grep -v bash | awk" + ' \'{print $2}\'')
 
