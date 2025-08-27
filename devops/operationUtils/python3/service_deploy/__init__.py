@@ -530,11 +530,11 @@ def find_maven_path() -> str:
 
 def send_msg(msg):
     msg_type = yaml.query("message.type")
-    if msg_type == "ding_group":
+    if msg_type == "ding_group": # 钉钉群聊机器人
         ding_group_config = yaml.query("message.config.ding_group")
         (DingdingGroupchat(ding_group_config['access_token'], ding_group_config['secret'])
          .send(msg))
-    elif msg_type == "qwx":
+    elif msg_type == "qwx": # 企业微信
         logging.info("消息发送暂不支持qwx模式")
 
 
