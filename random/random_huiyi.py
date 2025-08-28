@@ -3,8 +3,8 @@
 
 import random
 
-from devops.operationUtils.python3.mysql_slow_warn.slow_mysql_groupchat_robot import DingdingGroupchat
-
+# from devops.operationUtils.python3.mysql.slow_mysql_groupchat_robot import DingdingGroupchat
+from devops.operationUtils.python3.message.ding import DingdingGroupchat
 # 示例集合（可以是任何可迭代对象）
 sample_set = names = {
     "唐宇", "赵树全", "石磊", "卢帅", "乔通",

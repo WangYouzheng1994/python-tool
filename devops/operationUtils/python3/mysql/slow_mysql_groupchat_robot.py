@@ -1,6 +1,7 @@
 #!/user/bin/env python
 # -*-coding:utf-8-*-
 # 蒙牛正式环境慢sql机器人
+import logging
 import time
 import hmac
 import hashlib
@@ -11,6 +12,8 @@ import json
 
 class DingdingGroupchat:
     def __init__(self, access_token, secret):
+        if not( access_token and secret):
+            logging.error("参数为空！access_token=%s, secret=%s", access_token, secret)
         self.access_token = access_token
         self.secret = secret
         self.url = f'https://oapi.dingtalk.com/robot/send?access_token={self.access_token}'
@@ -39,18 +42,18 @@ class DingdingGroupchat:
             r.raise_for_status()
             return r.json()
         except requests.RequestException as e:
-            print(f"请求发生错误: {e}")
+            logging.exception(f"请求发生错误: {e}")
         except Exception as e:
-            print(f"发生未知错误: {e}")
+            logging.exception(f"发生未知错误: {e}")
 
 
 if __name__ == '__main__':
-    # access_token = 'a6c6f183c0b4f411028f828728cc731d811d5d1c3e50066597d50b0a90ce6d79'
-    # secret = 'SECb0134d59803807164943ddd032314040d8588ff15635c7409a4bc899e1a45718'
+    # MN群
+    # access_token = 'a6c6f183c0b4f411028f828728cc731d811d5d1c3e50066597d50b0a90ce6d79' # 蒙牛内部
+    # secret = 'SECb0134d59803807164943ddd032314040d8588ff15635c7409a4bc899e1a45718'# 蒙牛内部
 
-    # opsyndex 慢SQL
-    secret = 'SEC6d00bdfed15181ef1c93c6f4527893269656847cd55f248cefc6a4d3b327b1ce'
-    access_token = '508dc9040f4660229b6ae96eb02c64c3cebba080518be08db481fc3f931467f4'
+    access_token = '508dc9040f4660229b6ae96eb02c64c3cebba080518be08db481fc3f931467f4' # 蒙牛内部
+    secret = 'SEC6d00bdfed15181ef1c93c6f4527893269656847cd55f248cefc6a4d3b327b1ce'# 蒙牛内部
     dingding = DingdingGroupchat(access_token, secret)
     result = dingding.send("您有一条新工单~请及时处理~~(*￣︶￣) 啦啦啦啦啦啦啦啦", is_at_all=False)
     print('钉钉消息发送结果：', result)
