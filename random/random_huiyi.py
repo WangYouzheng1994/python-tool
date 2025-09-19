@@ -8,7 +8,7 @@ from devops.operationUtils.python3.message.ding import DingdingGroupchat
 # 示例集合（可以是任何可迭代对象）
 sample_set = names = {
     "唐宇", "赵树全", "石磊", "卢帅", "乔通",
-    "刘宝航", "刘宇航", "刁沛森", "冯俊杰", "江春阳",
+    "刘宝航", "刘宇航", "冯俊杰", "江春阳",
      "李兆旭", "黄绪鹏", "刘卫航", "朱涛", "刘新荣", "王志通", "杜家晖"
 }
 
