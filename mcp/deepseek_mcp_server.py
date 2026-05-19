@@ -143,6 +143,32 @@ def handle_list_tools(params: Dict) -> Dict[str, Any]:
                 }
             },
             {
+                "name": "design_solution",
+                "description": "针对需求做技术方案设计，给出至少3种方案并从性能稳定性、建设成本、远期迭代三个维度对比分析",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "requirement": {
+                            "type": "string",
+                            "description": "需求描述，越详细越好"
+                        },
+                        "tech_stack": {
+                            "type": "string",
+                            "description": "当前使用的技术栈，如 Go+Gin+MySQL+Redis"
+                        },
+                        "constraints": {
+                            "type": "string",
+                            "description": "约束条件，如性能要求、工期限制、兼容性要求等"
+                        },
+                        "existing_context": {
+                            "type": "string",
+                            "description": "现有系统上下文，如相关模块/接口/数据表信息"
+                        }
+                    },
+                    "required": ["requirement"]
+                }
+            },
+            {
                 "name": "analyze_bugs",
                 "description": "专门针对潜在的Bug、边界条件和异常处理进行深入分析",
                 "inputSchema": {
@@ -235,6 +261,50 @@ def handle_call_tool(name: str, arguments: Dict) -> Dict[str, Any]:
             ]
 
             result = deepseek_chat_completion(messages, temperature=0.3, max_tokens=4096)
+            if "error" in result:
+                return {"content": [{"type": "text", "text": f"API错误: {result['error']}"}]}
+
+            return {"content": [{"type": "text", "text": result["content"]}]}
+
+        elif name == "design_solution":
+            requirement = arguments.get("requirement", "")
+            tech_stack = arguments.get("tech_stack", "")
+            constraints = arguments.get("constraints", "")
+            existing_context = arguments.get("existing_context", "")
+
+            if not requirement.strip():
+                return {"content": [{"type": "text", "text": "错误：需求描述不能为空"}]}
+
+            system_prompt = """你是一位资深技术架构师，专长于技术方案设计。请针对需求给出详细的技术方案。
+
+要求：
+1. 给出至少 3 种实现方案，每种方案包含核心思路和关键代码示例
+2. 从以下三个维度对比分析每种方案：
+   - 性能与稳定性
+   - 建设成本（开发量、复杂度）
+   - 远期迭代（可扩展性、可维护性）
+3. 最后给出推荐方案及理由
+4. 方案中涉及的模块/接口需明确调用关系和职责边界
+
+输出格式：
+- 先概述需求理解（一句）
+- 然后逐方案展开，每方案含：思路 + 关键代码示例 + 三维度分析
+- 最后是推荐结论"""
+
+            user_prompt = f"需求：{requirement}"
+            if tech_stack:
+                user_prompt += f"\n当前技术栈：{tech_stack}"
+            if constraints:
+                user_prompt += f"\n约束条件：{constraints}"
+            if existing_context:
+                user_prompt += f"\n现有系统上下文：{existing_context}"
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+
+            result = deepseek_chat_completion(messages, temperature=0.5, max_tokens=8192)
             if "error" in result:
                 return {"content": [{"type": "text", "text": f"API错误: {result['error']}"}]}
 
