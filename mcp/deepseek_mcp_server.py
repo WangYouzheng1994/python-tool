@@ -14,7 +14,19 @@ from typing import Any, Dict, List, Optional
 
 DEEPSEEK_BASE = "https://api.deepseek.com"
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+
+_raw_key = os.environ.get("DEEPSEEK_API_KEY", "")
+try:
+    _raw_key.encode("latin-1")
+except UnicodeEncodeError:
+    sys.stderr.write(
+        "ERROR: DEEPSEEK_API_KEY contains non-ASCII characters.\n"
+        "Please check your Trae MCP config JSON and ensure the key value is ASCII-only.\n"
+        "Common causes: smart quotes, zero-width characters, or encoding issues during copy-paste.\n"
+    )
+    sys.stderr.flush()
+    _raw_key = _raw_key.encode("ascii", errors="ignore").decode("ascii")
+DEEPSEEK_API_KEY = _raw_key.strip()
 
 
 def deepseek_chat_completion(
@@ -25,7 +37,7 @@ def deepseek_chat_completion(
 ) -> Dict[str, Any]:
     """调用DeepSeek Chat Completion API"""
     if not DEEPSEEK_API_KEY:
-        return {"error": "未设置 DEEPSEEK_API_KEY 环境变量"}
+        return {"error": "DEEPSEEK_API_KEY 未设置或已被过滤为无效值，请检查 key 是否含非 ASCII 字符"}
 
     url = f"{DEEPSEEK_BASE}/chat/completions"
     payload = {
@@ -262,6 +274,8 @@ def handle_request(request: Dict) -> Optional[Dict]:
 
 def main():
     """主循环"""
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     sys.stderr.write("DeepSeek MCP Server starting...\n")
     sys.stderr.write(f"Model: {DEEPSEEK_MODEL}\n")
 
