@@ -1,0 +1,7 @@
+/test_file/
+/.venv/
+__pycache__/
+*.py[cod]
+/.ocr-output/
+/models/
+/.claude/settings.local.json

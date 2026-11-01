@@ -1,0 +1,20 @@
+[project]
+name = "ticket-ocr"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "wangyouzheng", email = "353735348@qq.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "onnxruntime>=1.31.1",
+    "rapidocr>=3.10.0",
+]
+
+[project.scripts]
+ticket-ocr = "ticket_ocr:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
